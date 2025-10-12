@@ -2456,15 +2456,22 @@ class Chatbot {
                 // Apply Markdown formatting
                 textContent = this.applyMarkdownFormatting(textContent);
                 
+                // Clean up any extra whitespace and empty lines
+                textContent = textContent.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
+                
                 // Split into paragraphs, but don't wrap tables in <p> tags
                 const paragraphs = textContent.split('\n\n').filter(p => p.trim());
                 for (const paragraph of paragraphs) {
-                    if (paragraph.trim()) {
+                    const trimmedParagraph = paragraph.trim();
+                    if (trimmedParagraph) {
                         // Check if this paragraph contains a table
-                        if (paragraph.includes('<table>')) {
-                            processedContent += paragraph.trim();
+                        if (trimmedParagraph.includes('<table>')) {
+                            processedContent += trimmedParagraph;
                         } else {
-                            processedContent += `<p>${paragraph.trim()}</p>`;
+                            // Only add paragraph if it's not just whitespace or empty
+                            if (trimmedParagraph.length > 0) {
+                                processedContent += `<p>${trimmedParagraph}</p>`;
+                            }
                         }
                     }
                 }
@@ -2553,7 +2560,10 @@ class Chatbot {
                     inTable = false;
                     tableLines = [];
                 }
-                result.push(line);
+                // Only add non-empty lines to avoid extra spacing
+                if (line.trim()) {
+                    result.push(line);
+                }
             }
         }
         

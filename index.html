@@ -1,12 +1,11 @@
 <!DOCTYPE html>
-<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="google-site-verification" content="AUEelyokQcobYiJQp-LK6YBgE-tyo3T-fu_zLHHRhvE" />
-  <!-- Content Security Policy to prevent XSS attacks -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://rsms.me https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://rsms.me https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://nvidia-nim-bot.onrender.com https://Nvidia.pythonanywhere.com http://localhost:5000; object-src 'none'; base-uri 'self'; form-action 'self';" />
+  <!-- Enhanced Content Security Policy to prevent XSS attacks -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.googletagmanager.com https://code.jquery.com https://cdn.datatables.net; style-src 'self' https://rsms.me https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.datatables.net; font-src 'self' https://rsms.me https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://nvidia-nim-bot.onrender.com https://Nvidia.pythonanywhere.com http://localhost:5000; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests; block-all-mixed-content;" />
   <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-5H2HH2MP1L"></script>
 <script>
@@ -23,14 +22,14 @@
   <link rel="alternate icon" href="Main_Logo.svg">
   <link rel="mask-icon" href="Main_Logo.svg" color="#76b900">
   <!-- Production-ready stylesheets - No CDN dependencies for core functionality -->
-  <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css" integrity="sha384-..." crossorigin="anonymous" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha384-..." crossorigin="anonymous">
   <!-- Custom Tailwind replacement - Contains only the classes actually used -->
   <link rel="stylesheet" href="tailwind-custom.css" />
   <link rel="stylesheet" href="style.css" />
   <!-- DataTables CSS -->
-  <link rel="stylesheet" href="https://cdn.datatables.net/2.1.2/css/dataTables.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/2.1.2/css/dataTables.dataTables.min.css" integrity="sha384-..." crossorigin="anonymous">
 </head>
 <body class="bg-neutral-950 text-gray-100 font-inter">
     <div class="chat-container">
@@ -137,8 +136,8 @@
     </div>
     
     <!-- jQuery and DataTables JS -->
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="https://cdn.datatables.net/2.1.2/js/dataTables.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha384-..." crossorigin="anonymous"></script>
+    <script src="https://cdn.datatables.net/2.1.2/js/dataTables.min.js" integrity="sha384-..." crossorigin="anonymous"></script>
     <script src="script.js"></script>
 </body>
 </html>

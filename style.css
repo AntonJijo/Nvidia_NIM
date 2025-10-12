@@ -3333,6 +3333,27 @@ body {
     margin-top: 0;
 }
 
+/* Additional DataTables styling to ensure proper layout */
+.message-content table.dataTable {
+    margin-top: 0 !important;
+    border-collapse: collapse;
+    width: 100% !important;
+}
+
+.message-content .dataTables_wrapper {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+.message-content .dataTables_wrapper .dataTables_length,
+.message-content .dataTables_wrapper .dataTables_filter,
+.message-content .dataTables_wrapper .dataTables_info,
+.message-content .dataTables_wrapper .dataTables_processing,
+.message-content .dataTables_wrapper .dataTables_paginate {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
 .message-content th,
 .message-content td {
     border: 1px solid rgba(76, 175, 80, 0.3);

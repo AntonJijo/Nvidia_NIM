@@ -3,8 +3,7 @@
 An intelligent, multi-model chatbot backend powered by **NVIDIA NIM** and **OpenRouter**.  
 This app brings cutting-edge AI models into a simple API you can integrate with frontend securely.
 
-## UNDER FIX DEPLOYMENTS
----
+## UNDER FIX DEVELOPMENTS!
 
 ## ✨ Highlights
 - 🚀 **Fast & Secure** Flask backend deployed on Render

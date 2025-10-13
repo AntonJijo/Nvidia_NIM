@@ -868,11 +868,6 @@ class Chatbot {
     }
 
     validateUserInput(message) {
-        // Check if message is a string
-        if (typeof message !== 'string') {
-            return { isValid: false, error: 'Invalid message format' };
-        }
-
         // Check length
         if (message.length > 10000) {
             return { isValid: false, error: 'Message too long (max 10,000 characters)' };
@@ -893,16 +888,7 @@ class Chatbot {
             /<embed[^>]*>/i,
             /<link[^>]*>/i,
             /<meta[^>]*>/i,
-            /<style[^>]*>/i,
-            /eval\s*\(/i,
-            /exec\s*\(/i,
-            /import\s+os/i,
-            /import\s+sys/i,
-            /__import__/i,
-            /globals\s*\(/i,
-            /locals\s*\(/i,
-            /chr\s*\(/i,
-            /ord\s*\(/i
+            /<style[^>]*>/i
         ];
 
         for (const pattern of suspiciousPatterns) {
@@ -915,11 +901,6 @@ class Chatbot {
         const specialCharCount = (message.match(/[<>'"&]/g) || []).length;
         if (specialCharCount > message.length * 0.1) {
             return { isValid: false, error: 'Message contains too many special characters' };
-        }
-
-        // Check for control characters
-        if (/[ --]/.test(message)) {
-            return { isValid: false, error: 'Message contains invalid control characters' };
         }
 
         return { isValid: true, error: null };
@@ -2496,6 +2477,7 @@ class Chatbot {
                 }
             }
         }
+        
         console.log('Final processed content length:', processedContent.length);
         console.log('First 200 chars:', processedContent.substring(0, 200));
         

@@ -8,10 +8,6 @@ import tempfile
 import json
 import re
 import html
-import hmac
-import hashlib
-import time
-import base64
 from datetime import datetime
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
@@ -38,7 +34,6 @@ CORS(app,
 NVIDIA_API_KEY = os.getenv('NVIDIA_API_KEY')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 EXPORT_KEY = os.getenv('EXPORT_KEY')
-FRONTEND_SHARED_SECRET = os.getenv('FRONTEND_SHARED_SECRET')
 
 # Allowed AI models
 ALLOWED_MODELS = {
@@ -50,14 +45,7 @@ ALLOWED_MODELS = {
     'openai/gpt-oss-120b',
     'qwen/qwen3-235b-a22b:free',
     'google/gemma-3-27b-it:free',
-    'x-ai/grok-4-fast:free',
 }
-
-# Security configuration
-MAX_MESSAGE_LENGTH = 10000  # Maximum message length in characters
-MAX_SESSION_ID_LENGTH = 100  # Maximum session ID length
-TOKEN_EXPIRY_SECONDS = 86400  # 24 hours
-TOKEN_REFRESH_BUFFER = 7200   # 2 hours before expiry for refresh
 
 if not NVIDIA_API_KEY:
     print("WARNING: NVIDIA_API_KEY not set!")
@@ -65,8 +53,6 @@ if not OPENROUTER_API_KEY:
     print("WARNING: OPENROUTER_API_KEY not set!")
 if not EXPORT_KEY:
     print("WARNING: EXPORT_KEY not set!")
-if not FRONTEND_SHARED_SECRET:
-    print("WARNING: FRONTEND_SHARED_SECRET not set!")
 
 # ---------------------
 # Security and validation functions
@@ -113,8 +99,8 @@ def validate_message_content(message):
         return False, "Invalid message format"
     
     # Check length limits
-    if len(message) > MAX_MESSAGE_LENGTH:
-        return False, f"Message too long (max {MAX_MESSAGE_LENGTH} characters)"
+    if len(message) > 10000:  # 10KB limit
+        return False, "Message too long (max 10,000 characters)"
     
     if len(message.strip()) == 0:
         return False, "Message cannot be empty"
@@ -130,16 +116,7 @@ def validate_message_content(message):
         r'<embed[^>]*>',
         r'<link[^>]*>',
         r'<meta[^>]*>',
-        r'<style[^>]*>',
-        r'eval\s*\(',
-        r'exec\s*\(',
-        r'import\s+os',
-        r'import\s+sys',
-        r'__import__',
-        r'globals\s*\(',
-        r'locals\s*\(',
-        r'chr\s*\(',
-        r'ord\s*\('
+        r'<style[^>]*>'
     ]
     
     for pattern in suspicious_patterns:
@@ -148,35 +125,16 @@ def validate_message_content(message):
     
     return True, "Valid"
 
-# Enhanced rate limiting using in-memory storage
+# Simple rate limiting using in-memory storage
 from collections import defaultdict, deque
 import time
 
-# Separate rate limit storage for different endpoints
 rate_limit_storage = defaultdict(deque)
-token_rate_limit_storage = defaultdict(deque)
 
-# Rate limiting configuration
-RATE_LIMITS = {
-    'default': {'max_requests': 10, 'window_seconds': 60},
-    'token': {'max_requests': 5, 'window_seconds': 60},
-    'chat': {'max_requests': 30, 'window_seconds': 60}
-}
-
-def check_rate_limit(ip_address, limit_type='default'):
-    """Enhanced rate limiting based on IP address and request type"""
-    # Get rate limit configuration
-    config = RATE_LIMITS.get(limit_type, RATE_LIMITS['default'])
-    max_requests = config['max_requests']
-    window_seconds = config['window_seconds']
-    
-    # Select appropriate storage based on limit type
-    if limit_type == 'token':
-        requests = token_rate_limit_storage[ip_address]
-    else:
-        requests = rate_limit_storage[ip_address]
-    
+def check_rate_limit(ip_address, max_requests=10, window_seconds=60):
+    """Simple rate limiting based on IP address"""
     now = time.time()
+    requests = rate_limit_storage[ip_address]
     
     # Remove old requests outside the window
     while requests and requests[0] <= now - window_seconds:
@@ -217,108 +175,6 @@ def validate_request_origin():
     # Allow requests without origin/referer (e.g., direct API calls)
     return True
 
-# ---------------------
-# Token-based authentication functions
-# ---------------------
-
-def generate_access_token():
-    """Generate a secure, short-lived access token using HMAC-SHA256"""
-    if not FRONTEND_SHARED_SECRET:
-        raise ValueError("FRONTEND_SHARED_SECRET not configured")
-    
-    # Get current timestamp
-    timestamp = int(time.time())
-    
-    # Create payload with timestamp and expiration (24 hours from now for frontend)
-    payload = {
-        'timestamp': timestamp,
-        'expires': timestamp + TOKEN_EXPIRY_SECONDS,  # Configurable expiration
-        'nonce': os.urandom(16).hex(),  # Random nonce to prevent reuse
-        'issuer': 'nvidia-chatbot'  # Add issuer for additional validation
-    }
-    
-    # Create message to sign
-    message = f"{payload['timestamp']}:{payload['expires']}:{payload['nonce']}:{payload['issuer']}"
-    
-    # Generate HMAC-SHA256 signature
-    signature = hmac.new(
-        FRONTEND_SHARED_SECRET.encode('utf-8'),
-        message.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest()
-    
-    # Create token with signature
-    token_data = f"{message}:{signature}"
-    
-    # Base64 encode the token for safe transmission
-    token = base64.b64encode(token_data.encode('utf-8')).decode('utf-8')
-    
-    return token, payload['expires']
-
-def verify_access_token(token):
-    """Verify and validate the access token"""
-    if not FRONTEND_SHARED_SECRET:
-        return False, "Token verification not configured"
-    
-    try:
-        # Decode base64 token
-        token_data = base64.b64decode(token.encode('utf-8')).decode('utf-8')
-        
-        # Split token components
-        parts = token_data.split(':')
-        if len(parts) != 5:  # Now we have 5 parts: timestamp, expires, nonce, issuer, signature
-            return False, "Invalid token format"
-        
-        timestamp, expires, nonce, issuer, signature = parts
-        
-        # Verify issuer
-        if issuer != 'nvidia-chatbot':
-            return False, "Invalid token issuer"
-        
-        # Verify signature
-        message = f"{timestamp}:{expires}:{nonce}:{issuer}"
-        expected_signature = hmac.new(
-            FRONTEND_SHARED_SECRET.encode('utf-8'),
-            message.encode('utf-8'),
-            hashlib.sha256
-        ).hexdigest()
-        
-        # Use constant-time comparison to prevent timing attacks
-        if not hmac.compare_digest(signature, expected_signature):
-            return False, "Invalid token signature"
-        
-        # Check expiration
-        current_time = int(time.time())
-        if current_time > int(expires):
-            return False, "Token expired"
-        
-        # Check if token is too old (additional security) - using configurable time
-        if current_time - int(timestamp) > TOKEN_EXPIRY_SECONDS:
-            return False, "Token too old"
-        
-        return True, "Token valid"
-        
-    except Exception as e:
-        return False, f"Token verification failed: {str(e)}"
-
-def validate_frontend_origin():
-    """Validate that the request comes specifically from the frontend"""
-    origin = request.headers.get('Origin')
-    referer = request.headers.get('Referer')
-    
-    # Only allow the specific frontend domain
-    allowed_frontend = "https://antonjijo.github.io"
-    
-    # Check origin header first
-    if origin and origin == allowed_frontend:
-        return True
-    
-    # Check referer header as fallback
-    if referer and referer.startswith(allowed_frontend):
-        return True
-    
-    return False
-
 def log_session_details(session_id, user_message, selected_model, conversation_messages, api_response=None, error=None):
     """Append session info to chat_logs.jsonl"""
     log_entry = {
@@ -353,37 +209,6 @@ def log_session_details(session_id, user_message, selected_model, conversation_m
         print(f"ERROR: Failed to write log: {e}")
 
 # ---------------------
-# Token endpoint
-# ---------------------
-
-@app.route('/get_token', methods=['GET'])
-def get_token():
-    """Generate a secure access token for frontend authentication"""
-    try:
-        # Validate that request comes from the frontend
-        if not validate_frontend_origin():
-            return jsonify({'error': 'Request origin not allowed'}), 403
-        
-        # Rate limiting for token requests (more restrictive)
-        client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
-        if not check_rate_limit(client_ip, limit_type='token'):
-            return jsonify({'error': 'Token request rate limit exceeded'}), 429
-        
-        # Generate secure token
-        token, expires = generate_access_token()
-        
-        return jsonify({
-            'token': token,
-            'expires': expires,
-            'expires_in': 86400  # 24 hours for frontend
-        })
-        
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 500
-    except Exception as e:
-        return jsonify({'error': 'Token generation failed'}), 500
-
-# ---------------------
 # Chat endpoint
 # ---------------------
 
@@ -395,25 +220,13 @@ def chat():
     conversation_messages = []
 
     try:
-        # Token-based authentication (required for all chat requests)
-        auth_header = request.headers.get('Authorization', '')
-        if not auth_header.startswith('Bearer '):
-            return jsonify({'error': 'Missing or invalid authorization header'}), 401
-        
-        token = auth_header[7:]  # Remove 'Bearer ' prefix
-        
-        # Verify the access token
-        is_valid, error_msg = verify_access_token(token)
-        if not is_valid:
-            return jsonify({'error': f'Token verification failed: {error_msg}'}), 401
-        
-        # Origin validation (additional security layer)
+        # Origin validation
         if not validate_request_origin():
             return jsonify({'error': 'Request origin not allowed'}), 403
 
         # Rate limiting check
         client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
-        if not check_rate_limit(client_ip, limit_type='chat'):
+        if not check_rate_limit(client_ip):
             return jsonify({'error': 'Rate limit exceeded. Please try again later.'}), 429
 
         if not NVIDIA_API_KEY and not OPENROUTER_API_KEY:
@@ -479,8 +292,7 @@ def chat():
 
     except Exception as e:
         log_session_details(session_id, user_message, selected_model, conversation_messages, error=str(e))
-        # Don't expose internal error details to frontend
-        return jsonify({'error': 'An internal error occurred. Please try again later.'}), 500
+        return jsonify({'error': str(e)}), 500
 
 # ---------------------
 # Health endpoint
@@ -559,3 +371,4 @@ if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     print(f"Starting NVIDIA Chatbot Server on port {port}...")
     app.run(host='0.0.0.0', port=port, debug=False)
+

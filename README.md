@@ -1,10 +1,9 @@
 # NVIDIA NIM Chatbot 🤖
 
 An intelligent, multi-model chatbot backend powered by **NVIDIA NIM** and **OpenRouter**.  
-This app brings cutting-edge AI models into a simple API you can integrate with any frontend.
+This app brings cutting-edge AI models into a simple API you can integrate with frontend securely.
 
-## Still Fixes are deployed one by one
-
+## UNDER FIX DEPLOYMENTS
 ---
 
 ## ✨ Highlights
@@ -23,9 +22,8 @@ Our chatbot supports multiple state-of-the-art LLMs:
 - **Qwen 2.5 & 3 series**
 - **Google Gemma 3 27B**
 - **OpenAI GPT OSS 120B**
-- **X'AI GROK 4**
 
-More models can be added easily!
+More models arriving soon!
 
 ---
 

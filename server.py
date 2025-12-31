@@ -27,7 +27,11 @@ CORS(app,
          "https://antonjijo.github.io",
          "https://nvidia-nim.pages.dev",
          "https://nvidia-nim-bot.onrender.com",
-         "https://Nvidia.pythonanywhere.com"
+         "https://Nvidia.pythonanywhere.com",
+         "http://localhost:8000",
+         "http://127.0.0.1:8000",
+         "http://localhost:5500",
+         "http://127.0.0.1:5500"
      ],
      methods=["GET", "POST"],
      allow_headers=["Content-Type", "X-API-KEY"],
@@ -211,7 +215,11 @@ def validate_request_origin():
         "https://antonjijo.github.io",
         "https://nvidia-nim.pages.dev",
         "https://nvidia-nim-bot.onrender.com",
-        "https://Nvidia.pythonanywhere.com"
+        "https://Nvidia.pythonanywhere.com",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:5500",
+        "http://127.0.0.1:5500"
     ]
     
     # Check origin header
@@ -255,7 +263,10 @@ def log_session_details(session_id, user_message, selected_model, conversation_m
         log_entry["ai_response_text"] = f"Error: {str(error)}"
 
     # Save to file
-    # Production: Always write to log
+    # Skip logging in debug mode to prevent Live Server reload
+    if app.debug:
+        print("DEBUG: Skipping log write to prevent Live Server reload")
+        return
 
 
     try:
@@ -680,6 +691,7 @@ def chat():
             user_message = request.form.get('message', '')
             session_id = request.form.get('session_id', 'default')
             selected_model = request.form.get('model', selected_model)
+            mode = request.form.get('mode', 'default')
             
             # File Handling (Stage 1)
             if 'file' in request.files:
@@ -712,6 +724,7 @@ def chat():
             user_message = data.get('message', '')
             session_id = data.get('session_id', 'default')
             selected_model = data.get('model', selected_model)
+            mode = data.get('mode', 'default')
 
 
         # Validate session ID
@@ -737,7 +750,7 @@ def chat():
 
         # WEB SEARCH LOGIC (Auto-Classify)
         # WEB SEARCH LOGIC (Auto-Classify)
-        if user_message and len(user_message) > 5:
+        if user_message and len(user_message) > 5 and mode != 'study': # Skip search in Study Mode?
              print(f"DEBUG: Checking if web search is needed for: {user_message[:50]}...")
              if classify_query(user_message):
                  print("DEBUG: Web Search REQUIRED.")
@@ -755,6 +768,13 @@ def chat():
                  print("DEBUG: Web Search NOT Required.")
 
         memory_manager = get_memory_manager(session_id)
+        
+        # Apply Mode (Study vs Default)
+        if mode == 'study':
+            memory_manager.set_study_mode(True)
+        else:
+            memory_manager.set_study_mode(False) # Ensure we revert to default if not study
+            
         memory_manager.set_model(selected_model)
         
         # Add context (File Analysis + Web Search)
@@ -769,6 +789,10 @@ def chat():
                  final_user_content += f"{web_search_context}\n\n"
             
             final_user_content += f"User question:\n{user_message}"
+
+        # Force enforcement of Study Mode Protocol in the immediate context
+        if mode == 'study':
+             final_user_content += "\n\n[SYSTEM MANDATE: You are in Study Mode (Professor Nexus). STRICTLY follow the 'Professional Tutor' protocol (No 'Step' labels). Use STRUCTURED FORMATTING (Headers, Bullets). If the user is confused, switch to ANALOGIES/STORIES immediately. You MUST end with a distinct 'Knowledge Check' section.]"
         
         memory_manager.add_message('user', final_user_content)
         conversation_messages = memory_manager.get_conversation_buffer()
@@ -990,5 +1014,5 @@ def cleanup_logs():
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 8000))
     print(f"Starting NVIDIA Chatbot Server on port {port}...")
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port, debug=True)
 

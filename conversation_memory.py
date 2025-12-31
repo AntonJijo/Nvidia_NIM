@@ -22,7 +22,7 @@ except ImportError:
     print("Warning: TikToken not available, using fallback tokenization")
 
 # Import strict global persona + formatting enforcement
-from system_prompts import get_master_system_prompt, enforce_formatting
+from system_prompts import get_master_system_prompt, enforce_formatting, STUDY_MODE_SYSTEM_PROMPT
 
 
 @dataclass
@@ -161,8 +161,12 @@ class ConversationMemoryManager:
         # Add pinned global system rules
         self._add_system_prompt()
 
-    def _add_system_prompt(self):
-        system_content = get_master_system_prompt()
+    def _add_system_prompt(self, is_study_mode: bool = False):
+        if is_study_mode:
+            system_content = STUDY_MODE_SYSTEM_PROMPT
+        else:
+            system_content = get_master_system_prompt()
+            
         system_msg = ConversationMessage(
             role="system",
             content=system_content,
@@ -171,6 +175,16 @@ class ConversationMemoryManager:
             is_pinned=True,
         )
         self.messages.append(system_msg)
+
+    def set_study_mode(self, enabled: bool = True):
+        """Switches the system prompt to Study Mode or reverts to default."""
+        # Remove existing system prompt
+        self.messages = [m for m in self.messages if m.role != "system" or not m.is_pinned]
+        # Add new prompt
+        self._add_system_prompt(is_study_mode=enabled)
+        # Ensure system prompt is first
+        sys_msg = self.messages.pop(-1) # _add_system_prompt appends to end
+        self.messages.insert(0, sys_msg)
 
     def set_model(self, model_name: str):
         self.current_model = model_name

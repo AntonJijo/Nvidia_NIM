@@ -107,6 +107,8 @@
         this.sessionId = this.generateSessionId();
         this.conversationStats = null;
         this.selectedFile = null;
+        this.currentMode = 'default';
+        this.slashMenu = null;
 
         this.setupMarkdown(); // Initialize Markdown pipeline
 
@@ -211,7 +213,7 @@
 
     async getConversationStats() {
         try {
-            const servers = window.location.hostname === 'antonjijo.github.io'
+            const servers = (window.location.hostname === 'antonjijo.github.io' || window.location.hostname === 'nvidia-nim.pages.dev')
                 ? ['https://nvidia-nim-bot.onrender.com', 'https://Nvidia.pythonanywhere.com']
                 : ['http://localhost:8000'];
 
@@ -245,9 +247,9 @@
 
     async clearConversation() {
         try {
-            const servers = window.location.hostname === 'antonjijo.github.io'
+            const servers = (window.location.hostname === 'antonjijo.github.io' || window.location.hostname === 'nvidia-nim.pages.dev')
                 ? ['https://nvidia-nim-bot.onrender.com', 'https://Nvidia.pythonanywhere.com']
-                : ['http://localhost:8000']; // DEV_MODE: Change to 5000 for production
+                : ['http://localhost:8000'];
 
             for (const serverURL of servers) {
                 try {
@@ -348,6 +350,12 @@
             this.fileInput.addEventListener('change', (e) => {
                 this.handleFileSelect(e);
             });
+        }
+
+        // Initialize Slash Menu
+        this.createSlashMenu();
+        if (this.messageInput) {
+            this.messageInput.addEventListener('input', (e) => this.handleSlashInput(e));
         }
 
 
@@ -763,7 +771,7 @@
                 e.stopPropagation();
                 if (this.sidebar?.classList.contains('expanded')) {
                     // Sidebar is open - open external link
-                    window.open('https://antonjijo.github.io/Nvidia_NIM/', '_blank');
+                    window.open('https://nvidia-nim.pages.dev/', '_blank');
                 } else {
                     // Sidebar is closed - expand it
                     this.sidebar?.classList.add('expanded');
@@ -1238,6 +1246,81 @@
         return allowedImageTypes.includes(file.type) || imageExts.includes(ext);
     }
 
+    handleSlashInput(e) {
+        if (this.messageInput.value === '/') {
+            if (this.slashMenu) this.slashMenu.classList.add('visible');
+        } else {
+            // Only hide if we aren't typing a command (for now just hide if not exactly /)
+            // But user might type /s ... -> we can keep it simple: only show on exact '/'
+            if (this.slashMenu) this.slashMenu.classList.remove('visible');
+        }
+        this.autoResizeTextarea();
+    }
+
+    createSlashMenu() {
+        const inputWrapper = document.getElementById('inputWrapper');
+        if (!inputWrapper) return;
+
+        const menu = document.createElement('div');
+        menu.className = 'slash-menu';
+
+        const item = document.createElement('div');
+        item.className = 'slash-item';
+        item.innerHTML = '<i class="fas fa-graduation-cap"></i><span>Study & Learn</span>';
+        item.onclick = () => this.setMode('study');
+
+        menu.appendChild(item);
+        inputWrapper.appendChild(menu);
+        this.slashMenu = menu;
+
+        // Hide menu on outside click
+        document.addEventListener('click', (e) => {
+            if (this.slashMenu && this.slashMenu.classList.contains('visible') && !this.slashMenu.contains(e.target) && e.target !== this.messageInput) {
+                this.slashMenu.classList.remove('visible');
+            }
+        });
+    }
+
+    setMode(mode) {
+        this.currentMode = mode;
+        if (this.slashMenu) this.slashMenu.classList.remove('visible');
+        this.messageInput.value = ''; // Clear slash
+        this.autoResizeTextarea();
+        this.renderModeBadge();
+        this.messageInput.focus();
+    }
+
+    renderModeBadge() {
+        // Remove existing badge
+        const wrapper = document.getElementById('inputWrapper');
+        if (!wrapper) return;
+
+        const existing = wrapper.querySelector('.mode-badge');
+        if (existing) existing.remove();
+
+        if (this.currentMode === 'study') {
+            const badge = document.createElement('div');
+            badge.className = 'mode-badge';
+            badge.title = "Click to exit Study Mode";
+            badge.onclick = () => { this.setMode('default'); };
+
+            // Icon + Text (Green style via CSS)
+            badge.innerHTML = '<i class="fas fa-book-open"></i> Study';
+
+            // Insert AFTER the left actions (the + button)
+            const leftActions = wrapper.querySelector('.input-left-actions');
+            if (leftActions) {
+                leftActions.insertAdjacentElement('afterend', badge);
+            } else {
+                wrapper.prepend(badge);
+            }
+
+            wrapper.classList.add('has-mode');
+        } else {
+            wrapper.classList.remove('has-mode');
+        }
+    }
+
     showTypingIndicator() {
         if (this.isTyping) return;
         this.isTyping = true;
@@ -1368,10 +1451,9 @@
             if (message && message.length > 5) {
                 (async () => {
                     try {
-                        const servers = [
-                            'https://nvidia-nim-bot.onrender.com',
-                            'https://Nvidia.pythonanywhere.com'
-                        ];
+                        const servers = (window.location.hostname === 'antonjijo.github.io' || window.location.hostname === 'nvidia-nim.pages.dev')
+                            ? ['https://nvidia-nim-bot.onrender.com', 'https://Nvidia.pythonanywhere.com']
+                            : ['http://localhost:8000'];
                         const serverURL = servers[0];
 
                         const checkResp = await fetch(`${serverURL}/api/classify`, {
@@ -1489,13 +1571,13 @@
     async callNvidiaAPI(message) {
         const selectedModel = this.modelSelect.value;
 
-        // Define server URLs for Production
-        const servers = [
-            'https://nvidia-nim-bot.onrender.com',
-            'https://Nvidia.pythonanywhere.com'
-        ];
+        // Define server URLs for Production/Dev
+        const servers = (window.location.hostname === 'antonjijo.github.io' || window.location.hostname === 'nvidia-nim.pages.dev')
+            ? ['https://nvidia-nim-bot.onrender.com', 'https://Nvidia.pythonanywhere.com']
+            : ['http://localhost:8000'];
 
         let lastError = null;
+        let finalMessage = message;
 
         // Try each server in sequence until one works
         for (let i = 0; i < servers.length; i++) {
@@ -1515,19 +1597,16 @@
                 if (this.selectedFile && !hasTextFileContent) {
                     // Image file - use multipart form data
                     const formData = new FormData();
-                    formData.append('message', message);
-                    formData.append('model', selectedModel);
+                    formData.append('message', finalMessage);
                     formData.append('session_id', this.sessionId);
+                    formData.append('model', selectedModel);
+                    formData.append('mode', this.currentMode); // Add mode
                     formData.append('file', this.selectedFile);
 
-
-                    // Fetch will automatically set the Content-Type to multipart/form-data with boundary
                     options.body = formData;
                 } else {
                     // Text-only OR text file with extracted content
                     options.headers = { 'Content-Type': 'application/json' };
-
-                    let finalMessage = message;
 
                     // If we have extracted text content from a file, prepend it to the message
                     if (hasTextFileContent) {
@@ -1539,7 +1618,7 @@
                         message: finalMessage,
                         model: selectedModel,
                         session_id: this.sessionId,
-
+                        mode: this.currentMode, // Send current mode (study/default)
                         max_tokens: 1024,
                         temperature: 0.7
                     });

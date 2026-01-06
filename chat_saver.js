@@ -10,16 +10,19 @@ class ChatSaver {
     init() {
         if (this.initialized) return;
 
-        // Check consent status
         const consent = localStorage.getItem(this.consentKey);
-        console.log('ChatSaver: Initializing, consent status:', consent);
 
         if (consent === 'accepted') {
             this.enableHistory();
         } else if (consent === 'declined') {
             this.disableHistory();
         } else {
-            this.showConsentPopup();
+            // Wait for Loader to Finish before showing popup
+            if (window.loaderFinished) {
+                this.showConsentPopup();
+            } else {
+                window.addEventListener('loader-complete', () => this.showConsentPopup());
+            }
         }
 
         // Search Popup Logic
@@ -97,13 +100,10 @@ class ChatSaver {
     }
 
     showConsentPopup() {
-        console.log('ChatSaver: Showing consent popup');
-        // Remove existing popup if any
         const existing = document.getElementById('cookie-consent-popup');
         if (existing) existing.remove();
 
         if (!document.body) {
-            console.error('ChatSaver: document.body is missing!');
             return;
         }
 
@@ -133,7 +133,6 @@ class ChatSaver {
         `;
 
         document.body.appendChild(popup);
-        console.log('ChatSaver: Popup appended to body');
 
         // Add event listeners
         document.getElementById('cookie-accept').addEventListener('click', () => this.handleConsent(true));
@@ -156,16 +155,35 @@ class ChatSaver {
     }
 
     enableHistory() {
-        console.log('Chat history enabled');
-        // If we have a current active chat, try to save it if it's new
-        if (window.chatbot && window.chatbot.messages.length > 0) {
+        // Wait for chatbot to be initialized if it's not ready yet
+        if (!window.chatbot || !window.chatbot.sessionId) {
+            // Retry after a short delay
+            setTimeout(() => this.enableHistory(), 100);
+            return;
+        }
+
+        // If chatbot has messages, save them
+        if (window.chatbot.messages && window.chatbot.messages.length > 0) {
             this.saveCurrentChat();
+        }
+        // If chatbot has no messages but session exists in history, restore it
+        else {
+            const history = this.getHistory();
+            const existingChat = history.find(c => c.id === window.chatbot.sessionId);
+
+            if (existingChat && existingChat.messages && existingChat.messages.length > 0) {
+                // Auto-restore the session - hide welcome screen first
+                const welcomeScreen = document.getElementById('welcomeScreen');
+                if (welcomeScreen) {
+                    welcomeScreen.style.display = 'none';
+                }
+                this.loadChat(window.chatbot.sessionId);
+            }
         }
     }
 
     disableHistory() {
-        console.log('Chat history disabled');
-        // We don't delete existing history, just stop showing/saving it
+        // History disabled - stop showing/saving
     }
 
     resetConsent() {
@@ -206,7 +224,7 @@ class ChatSaver {
             try {
                 localStorage.setItem(this.storageKey, JSON.stringify(history));
             } catch (e) {
-                console.error("Failed to save chat stats", e);
+                // Failed to save chat stats
             }
         }
     }
@@ -349,7 +367,7 @@ class ChatSaver {
                         if (title) break;
                     }
                 } catch (e) {
-                    console.warn(`Title generation failed on ${server}`, e);
+                    // Title generation failed
                 }
             }
 
@@ -372,7 +390,7 @@ class ChatSaver {
                 }
             }
         } catch (err) {
-            console.error('Error generating title:', err);
+            // Error generating title
         }
     }
 
@@ -380,7 +398,6 @@ class ChatSaver {
         try {
             return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
         } catch (e) {
-            console.error('Failed to parse chat history', e);
             return [];
         }
     }
@@ -482,6 +499,16 @@ class ChatSaver {
             // Restore session
             window.chatbot.sessionId = chat.id;
             window.chatbot.messages = chat.messages || []; // Ensure array
+
+            // Hide welcome screen since we're loading a conversation
+            if (window.chatbot.hideWelcomeScreen) {
+                window.chatbot.hideWelcomeScreen();
+            } else {
+                const welcomeScreen = document.getElementById('welcomeScreen');
+                if (welcomeScreen) {
+                    welcomeScreen.style.display = 'none';
+                }
+            }
 
             // Clear UI
             const messagesContainer = document.getElementById('chatMessages');
@@ -591,10 +618,8 @@ class ChatSaver {
                 if (statsEl) statsEl.style.display = 'none';
             }
 
-            // Re-render sidebar (will show "New chat" if in fresh state)
             this.renderSidebar();
             closeModal();
-            console.log('Chat deleted:', chatId);
         };
 
         // Close on overlay click

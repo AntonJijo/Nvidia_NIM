@@ -4,18 +4,13 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
+/* Font Logic Restored */
 @font-face {
     font-family: 'NvidiaLogo';
-    src: url('Logo.ttf') format('woff');
+    src: url('Logo.ttf') format('truetype');
     font-weight: normal;
     font-style: normal;
-}
-
-/* Custom Font Overrides */
-.user-name,
-.model-name {
-    font-family: 'NvidiaLogo', sans-serif !important;
-    letter-spacing: 1px;
+    font-display: swap;
 }
 
 /* CSS Variables */
@@ -52,6 +47,7 @@
     cursor: help;
     display: flex;
     align-items: center;
+    z-index: 50;
 }
 
 .info-tooltip-container:hover {
@@ -110,7 +106,8 @@ body {
 
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: var(--bg-main);
+    background: transparent;
+    /* Changed from var(--bg-main) to reveal 3D background */
     color: var(--text-primary);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
@@ -155,7 +152,12 @@ body {
     position: relative;
     z-index: 100;
     /* Right border separator */
-    border-right: 1px solid var(--border-color);
+    border-right: 1px solid rgba(118, 185, 0, 0.15);
+    /* Subtle Neon Border */
+    backdrop-filter: blur(20px);
+    /* Glassmorphism */
+    background: rgba(23, 23, 23, 0.75);
+    /* Semi-transparent */
 }
 
 .sidebar.expanded {
@@ -542,6 +544,8 @@ body {
     font-size: 14px;
     color: var(--text-primary);
     white-space: nowrap;
+    font-family: 'NvidiaLogo', sans-serif;
+    letter-spacing: 1px;
 }
 
 /* Sidebar Overlay (Mobile) */
@@ -549,7 +553,7 @@ body {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.6);
-    z-index: 99;
+    z-index: 201;
     opacity: 0;
     visibility: hidden;
     transition: opacity var(--transition-speed) var(--transition-ease);
@@ -558,6 +562,12 @@ body {
 .sidebar-overlay.active {
     opacity: 1;
     visibility: visible;
+}
+
+@media (min-width: 769px) {
+    .sidebar-overlay {
+        display: none !important;
+    }
 }
 
 /* ============================================
@@ -583,17 +593,148 @@ body {
     position: relative;
 }
 
+/* ============================================
+   COGNITIVE INDICATOR (Think Lattice)
+   ============================================ */
+.cognitive-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 30px;
+    position: relative;
+    overflow: visible;
+}
+
+.cognitive-node {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--nvid-green);
+    box-shadow: 0 0 8px var(--nvid-green);
+}
+
+.cognitive-link {
+    position: absolute;
+    height: 1px;
+    background: var(--nvid-green);
+    transform-origin: left center;
+    opacity: 0.4;
+}
+
+/* ============================================
+   COGNITIVE INDICATOR (Think Lattice)
+   ============================================ */
+.cognitive-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 30px;
+    position: relative;
+    overflow: visible;
+}
+
+.cognitive-node {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--nvid-green);
+    box-shadow: 0 0 8px var(--nvid-green);
+}
+
+.cognitive-link {
+    position: absolute;
+    height: 1px;
+    background: var(--nvid-green);
+    transform-origin: left center;
+    opacity: 0.4;
+}
+
+/* ============================================
+   PREMIUM LOGO LOADER (MANDATORY)
+   ============================================ */
+.logo-loader-overlay {
+    position: fixed;
+    inset: 0;
+    background: #0f0f0f;
+    /* Deep black/gray */
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.logo-loader-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.logo-loader svg {
+    max-width: 120px;
+    height: auto;
+}
+
+.logo-loader svg path {
+    fill: transparent;
+    stroke: #76b900;
+    stroke-width: 1.5px;
+    stroke-dasharray: 5000;
+    stroke-dashoffset: 5000;
+    animation: logoDraw 2.5s cubic-bezier(0.22, 1, 0.36, 1) forwards,
+        logoFill 1s ease 2s forwards,
+        logoShimmer 3s ease-in-out 3s infinite;
+}
+
+@keyframes logoDraw {
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+@keyframes logoFill {
+    from {
+        fill: transparent;
+        stroke-width: 1.5px;
+    }
+
+    to {
+        fill: #76b900;
+        stroke-width: 0;
+    }
+}
+
+@keyframes logoShimmer {
+
+    0%,
+    100% {
+        opacity: 1;
+        filter: brightness(1);
+    }
+
+    50% {
+        opacity: 0.8;
+        filter: brightness(1.2) drop-shadow(0 0 10px rgba(118, 185, 0, 0.4));
+    }
+}
+
+/* ============================================
+   HEADER CONTENT
+   ============================================ */
 .header-left {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 12px;
     position: relative;
 }
 
 .header-right {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 16px;
 }
 
 /* Model Selector */
@@ -659,21 +800,41 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 14px;
+    padding: 10px 14px;
     border-radius: 8px;
     color: var(--text-primary);
-    font-size: 14px;
     cursor: pointer;
     transition: background 0.15s ease;
+    gap: 12px;
 }
 
 .model-option:hover {
     background: var(--bg-hover);
 }
 
+.model-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+}
+
+.model-name-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.model-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
 .model-option .check-icon {
     opacity: 0;
     color: var(--text-primary);
+    flex-shrink: 0;
 }
 
 .model-option.selected .check-icon {
@@ -768,14 +929,21 @@ body {
 }
 
 .user-message .message-bubble {
-    background: var(--bg-user-message);
-    color: var(--text-primary);
+    background: rgba(74, 222, 128, 0.08);
+    /* Faint Green Tint */
+    border: 1px solid rgba(118, 185, 0, 0.2);
+    /* Neon Border */
+    color: #e5e7eb;
     padding: 12px 18px;
     border-radius: 22px;
+    border-bottom-right-radius: 4px;
+    /* Tech Style Corner */
     max-width: 70%;
     font-size: 15px;
     line-height: 1.6;
     word-wrap: break-word;
+    backdrop-filter: blur(5px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
 .bot-message {
@@ -799,6 +967,34 @@ body {
 
 .bot-message .message-content p:last-child {
     margin-bottom: 0;
+}
+
+/* List styling for message content - override global reset and TailwindCSS Preflight */
+.message-content ul,
+.message-content ol {
+    margin: 14px 0 !important;
+    padding-left: 24px !important;
+    list-style-position: outside !important;
+}
+
+.message-content ul {
+    list-style-type: disc !important;
+}
+
+.message-content ol {
+    list-style-type: decimal !important;
+}
+
+.message-content li {
+    margin: 8px 0 !important;
+    padding-left: 4px !important;
+}
+
+.message-content ul ul,
+.message-content ol ol,
+.message-content ul ol,
+.message-content ol ul {
+    margin: 8px 0 !important;
 }
 
 /* Message Actions */
@@ -837,54 +1033,114 @@ body {
     color: var(--accent-green);
 }
 
-/* Typing Indicator */
+/* NEURAL REACTOR (Replaces Dots) */
 .typing-indicator {
+    position: relative;
+    width: 60px;
+    /* Square container for radial animation */
+    height: 60px;
     display: flex;
-    gap: 5px;
-    padding: 12px 0;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    padding: 0;
 }
 
+/* Base style for all parts (dots repurposed) */
 .typing-dot {
-    width: 8px;
-    height: 8px;
-    background: var(--text-muted);
+    position: absolute;
+    background-color: transparent;
     border-radius: 50%;
-    animation: typingBounce 1.4s ease-in-out infinite;
+    transform-origin: center;
+    box-shadow: none;
+    animation: none;
+    width: auto;
+    height: auto;
 }
 
+/* Part 1: The Core (Hexagon) */
 .typing-dot:nth-child(1) {
-    animation-delay: 0s;
+    width: 16px;
+    height: 16px;
+    background: #76b900;
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    animation: reactorSpin 2s linear infinite;
+    z-index: 3;
+    box-shadow: 0 0 10px #76b900;
 }
 
+/* Part 2: Energy Ring (Dashed Orbit) */
 .typing-dot:nth-child(2) {
-    animation-delay: 0.2s;
+    width: 32px;
+    height: 32px;
+    border: 2px dashed rgba(118, 185, 0, 0.6);
+    background: transparent;
+    animation: reactorCounterSpin 4s linear infinite;
+    z-index: 2;
 }
 
+/* Part 3: Pulse Field (Expanding Wave) */
 .typing-dot:nth-child(3) {
-    animation-delay: 0.4s;
+    width: 10px;
+    height: 10px;
+    background: transparent;
+    border: 1px solid #76b900;
+    opacity: 0;
+    animation: reactorPulse 1.5s ease-out infinite;
+    z-index: 1;
 }
 
-@keyframes typingBounce {
+@keyframes reactorSpin {
+    0% {
+        transform: rotate(0deg) scale(1);
+        filter: brightness(1);
+    }
 
-    0%,
-    60%,
+    50% {
+        transform: rotate(180deg) scale(1.2);
+        filter: brightness(1.5);
+    }
+
     100% {
-        transform: translateY(0);
-        opacity: 0.4;
-    }
-
-    30% {
-        transform: translateY(-6px);
-        opacity: 1;
+        transform: rotate(360deg) scale(1);
+        filter: brightness(1);
     }
 }
+
+@keyframes reactorCounterSpin {
+    0% {
+        transform: rotate(360deg);
+    }
+
+    100% {
+        transform: rotate(0deg);
+    }
+}
+
+@keyframes reactorPulse {
+    0% {
+        width: 16px;
+        height: 16px;
+        opacity: 0.8;
+        border-width: 2px;
+    }
+
+    100% {
+        width: 48px;
+        height: 48px;
+        opacity: 0;
+        border-width: 0px;
+    }
+}
+
+
 
 /* ============================================
    INPUT AREA
    ============================================ */
 .input-area {
     padding: 0 24px 16px;
-    background: linear-gradient(to top, var(--bg-main) 70%, transparent);
+    background: transparent;
 }
 
 .input-container {
@@ -895,15 +1151,21 @@ body {
 .input-wrapper {
     display: flex;
     align-items: flex-end;
-    background: var(--bg-input);
-    border: 1px solid var(--border-color);
+    background: rgba(30, 30, 30, 0.6);
+    /* Semi-transparent */
+    border: 1px solid rgba(118, 185, 0, 0.15);
+    /* Neon Border */
     border-radius: 26px;
     padding: 10px 14px;
-    transition: border-color 0.15s ease;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
 .input-wrapper:focus-within {
-    border-color: #555;
+    border-color: #76b900;
+    box-shadow: 0 0 15px rgba(118, 185, 0, 0.15);
+    background: rgba(30, 30, 30, 0.85);
 }
 
 .input-left-actions {
@@ -1114,23 +1376,36 @@ body {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 4px;
+    padding: 4px 8px;
     background: transparent;
     border: none;
     border-radius: 4px;
     color: #9ca3af;
     font-size: 12px;
     cursor: pointer;
-    transition: color 0.15s ease;
+    transition: all 0.15s ease;
+    font-family: 'Inter', sans-serif;
+}
+
+.copy-button i {
+    font-size: 13px;
+}
+
+.copy-button .copy-text {
+    font-weight: 400;
 }
 
 .copy-button:hover {
     color: #ffffff;
-    background: transparent;
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .copy-button.copied {
     color: var(--accent-green);
+}
+
+.copy-button.copied .copy-text::after {
+    content: 'd';
 }
 
 .code-content {
@@ -2072,7 +2347,6 @@ blockquote {
 
     .sidebar.expanded {
         width: 80%;
-        box-shadow: 10px 0 50px rgba(0, 0, 0, 0.5);
     }
 
     /* Header Adjustments */
@@ -2401,17 +2675,26 @@ blockquote {
 }
 
 .model-badge {
-    display: inline-block;
-    padding: 2px 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
     border-radius: 4px;
     font-size: 11px;
-    font-weight: 600;
-    margin-top: 8px;
+    font-weight: 500;
+    margin-top: 10px;
+    width: fit-content;
 }
 
 .model-badge.free {
-    background: rgba(118, 185, 0, 0.15);
-    color: var(--accent-primary);
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+}
+
+.model-badge.free .verified-icon {
+    width: 14px;
+    height: 14px;
+    filter: sepia(1) saturate(6) hue-rotate(38deg) brightness(1.05) contrast(1.1);
 }
 
 @media (max-width: 768px) {
@@ -2428,4 +2711,405 @@ blockquote {
     .models-explorer-title {
         font-size: 20px;
     }
+}
+
+/* Slash Menu (Study Mode) */
+#inputWrapper {
+    position: relative;
+    /* Anchor for absolute menu */
+}
+
+.slash-menu {
+    position: absolute;
+    bottom: 100%;
+    /* Position above the input box */
+    left: 0;
+    margin-bottom: 8px;
+    /* Spacing */
+    background: #2f2f2f;
+    border: 1px solid #4f4f4f;
+    border-radius: 12px;
+    width: 220px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+    z-index: 1000;
+    display: none;
+    overflow: hidden;
+    flex-direction: column;
+    animation: fadeIn 0.1s ease-out;
+}
+
+.slash-menu.visible {
+    display: flex;
+}
+
+.slash-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #ececec;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: background 0.2s;
+}
+
+.slash-item:hover {
+    background: #424242;
+}
+
+.slash-item i {
+    color: #76b900;
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+}
+
+/* Premium Icons8 Icon in Slash Menu */
+.slash-item .slash-item-icon {
+    width: 20px;
+    height: 20px;
+    filter: invert(60%) sepia(98%) saturate(399%) hue-rotate(43deg) brightness(92%) contrast(93%);
+    transition: transform 0.2s ease;
+}
+
+.slash-item:hover .slash-item-icon {
+    transform: scale(1.15) rotate(-5deg);
+}
+
+.mode-badge {
+    background: linear-gradient(135deg, rgba(118, 185, 0, 0.15), rgba(118, 185, 0, 0.08));
+    color: #76b900;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 6px 14px 6px 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 12px;
+    margin-left: 4px;
+    border: 1px solid rgba(118, 185, 0, 0.3);
+    border-radius: 20px;
+    white-space: nowrap;
+    align-self: center;
+    height: auto;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: studyBadgeEnter 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    box-shadow: 0 2px 12px rgba(118, 185, 0, 0.15);
+}
+
+.mode-badge:hover {
+    background: linear-gradient(135deg, rgba(118, 185, 0, 0.25), rgba(118, 185, 0, 0.15));
+    border-color: rgba(118, 185, 0, 0.5);
+    box-shadow: 0 4px 20px rgba(118, 185, 0, 0.25);
+    transform: translateY(-1px);
+}
+
+.mode-badge:active {
+    transform: translateY(0) scale(0.98);
+}
+
+/* Premium Icons8 Study Mode Icon */
+.mode-badge .study-mode-icon {
+    width: 18px;
+    height: 18px;
+    filter: invert(60%) sepia(98%) saturate(399%) hue-rotate(43deg) brightness(92%) contrast(93%);
+    transition: transform 0.3s ease;
+}
+
+.mode-badge:hover .study-mode-icon {
+    transform: rotate(-8deg) scale(1.1);
+}
+
+/* Study Mode Text */
+.mode-badge .study-mode-text {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+/* Entrance Animation */
+@keyframes studyBadgeEnter {
+    0% {
+        opacity: 0;
+        transform: scale(0.8) translateY(5px);
+    }
+
+    50% {
+        transform: scale(1.05) translateY(-2px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.mode-badge .close-mode {
+    display: none;
+}
+
+/* Study Mode - Expanded Input Layout */
+#inputWrapper.has-mode {
+    min-height: 85px !important;
+    padding-bottom: 52px !important;
+    display: block !important;
+    position: relative;
+    border-radius: 26px;
+    transition: min-height 0.2s ease, padding 0.2s ease;
+}
+
+#inputWrapper.has-mode textarea {
+    width: 100% !important;
+    padding-left: 2px !important;
+    margin-left: 0 !important;
+    margin-top: 4px;
+    height: auto;
+    min-height: 24px;
+}
+
+#inputWrapper.has-mode .input-left-actions {
+    position: absolute;
+    bottom: 12px;
+    left: 14px;
+    margin: 0 !important;
+    z-index: 10;
+}
+
+#inputWrapper.has-mode .mode-badge {
+    position: absolute;
+    bottom: 15px;
+    /* Moved UP to align centers */
+    left: 48px;
+    margin: 0 !important;
+    z-index: 10;
+    align-self: auto;
+}
+
+#inputWrapper.has-mode .input-right-actions {
+    position: absolute;
+    bottom: 12px;
+    right: 14px;
+    margin: 0 !important;
+    z-index: 10;
+}
+
+/* ============================================
+   MARKDOWN CONTENT REFINEMENTS
+   ============================================ */
+.message-content hr {
+    margin: 24px 0 !important;
+    border: none;
+    height: 1px;
+    background: var(--border-color);
+    opacity: 0.4;
+}
+
+/* ============================================
+   DRAG & DROP VISUAL FEEDBACK
+   ============================================ */
+.input-wrapper.drag-over {
+    background: rgba(118, 185, 0, 0.1);
+    border-color: #76b900;
+    box-shadow: 0 0 0 3px rgba(118, 185, 0, 0.2);
+    transform: scale(1.02);
+}
+
+/* ============================================
+   ANIMATION SUPPORT CLASSES
+   ============================================ */
+/* Apply animated background to body */
+body.animated-background {
+    background: linear-gradient(135deg,
+            #212121 0%,
+            #1a1a1a 25%,
+            #242424 50%,
+            #1a1a1a 75%,
+            #212121 100%);
+    background-size: 400% 400%;
+}
+
+/* Ensure animations work smoothly */
+.message,
+.model-card,
+.model-option,
+.quick-reply-btn,
+.user-message,
+.bot-message {
+    will-change: transform, opacity;
+}
+
+/* Status text animation ready */
+.status-text {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================
+   PREMIUM NEON UI UPGRADE (Cyber-Deck Theme)
+   ============================================ */
+
+/* 1. Ambient Background Core */
+body::before {
+    content: '';
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60vw;
+    /* Reduced size for centralized glow */
+    height: 60vh;
+    background: radial-gradient(circle closest-side, rgba(118, 185, 0, 0.08), transparent 100%);
+    pointer-events: none;
+    z-index: -1;
+    animation: ambientPulse 8s ease-in-out infinite alternate;
+}
+
+/* Ambient Pulse Removed (Using loader background now) */
+
+/* 2. Glass-morphic Sidebar */
+#sidebar {
+    border-right: 1px solid rgba(118, 185, 0, 0.15) !important;
+    background: rgba(15, 15, 15, 0.6) !important;
+    backdrop-filter: blur(20px);
+}
+
+/* 3. Input Field Neon Focus */
+#userInput {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#userInput:focus {
+    border-color: #76b900 !important;
+    box-shadow: 0 0 20px rgba(118, 185, 0, 0.15), inset 0 0 10px rgba(118, 185, 0, 0.05);
+    background: rgba(40, 40, 40, 0.9);
+}
+
+/* 4. Active Conversation Glow (NEON INDICATOR UPGRADE) */
+.conversation-item {
+    margin: 4px 10px;
+    /* Spacing fix */
+    border: 1px solid transparent;
+    border-radius: 8px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.conversation-item.active {
+    background: linear-gradient(90deg, rgba(118, 185, 0, 0.1) 0%, transparent 100%) !important;
+    border: 1px solid rgba(118, 185, 0, 0.2);
+    /* Removed border-left conflict */
+    box-shadow: 0 0 20px rgba(118, 185, 0, 0.1);
+}
+
+.conversation-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 20%;
+    height: 60%;
+    width: 3px;
+    background: #76b900;
+    border-radius: 0 4px 4px 0;
+    box-shadow: 0 0 10px #76b900;
+}
+
+/* 5. Button Hover Shimmer */
+.primary-btn,
+.send-btn {
+    position: relative;
+    overflow: hidden;
+}
+
+.primary-btn::after,
+.send-btn::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -150%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: none;
+    transform: skewX(-20deg);
+}
+
+/* FORCE FONT FIX FOR CHAT BUBBLES */
+.message-content,
+.user-message .message-bubble,
+.bot-message,
+.conversation-title {
+    font-family: 'Inter', sans-serif !important;
+    letter-spacing: normal !important;
+    text-transform: none !important;
+}
+
+/* ============================================
+   TECH PATTERN BACKGROUND (ANIMATED)
+   ============================================ */
+/* ============================================
+   TECH PATTERN BACKGROUND (ANIMATED & GLOWING)
+   ============================================ */
+.tech-pattern-bg {
+    background-color: transparent;
+    opacity: 0.12;
+    /* Significantly reduced for subtlety */
+    background-image:
+        /* Primary Grid - Glow Layer (Wider, very faint) */
+        linear-gradient(rgba(118, 185, 0, 0.1) 2px, transparent 2px),
+        linear-gradient(90deg, rgba(118, 185, 0, 0.1) 2px, transparent 2px),
+        /* Primary Grid - Core Layer (Sharper but soft) */
+        linear-gradient(rgba(118, 185, 0, 0.4) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(118, 185, 0, 0.4) 1px, transparent 1px),
+        /* Secondary Micro Grid */
+        linear-gradient(rgba(118, 185, 0, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(118, 185, 0, 0.08) 1px, transparent 1px);
+    background-size:
+        100px 100px, 100px 100px,
+        /* Glow */
+        100px 100px, 100px 100px,
+        /* Core */
+        20px 20px, 20px 20px;
+    /* Micro */
+    background-position:
+        -2px -2px, -2px -2px,
+        -1px -1px, -1px -1px,
+        -1px -1px, -1px -1px;
+    animation: patternPan 60s linear infinite;
+}
+
+@keyframes patternPan {
+    0% {
+        background-position:
+            -2px -2px, -2px -2px,
+            -1px -1px, -1px -1px,
+            -1px -1px, -1px -1px;
+    }
+
+    100% {
+        background-position:
+            98px 98px, 98px 98px,
+            99px 99px, 99px 99px,
+            19px 19px, 19px 19px;
+    }
+}
+
+/* NUCLEAR FONT PROTECTION FOR CHAT MESSAGES */
+.chat-messages,
+.message,
+.message-content,
+.message-bubble,
+.message-inner,
+.message-inner p,
+.message-inner div,
+.message-inner span,
+.bot-message,
+.user-message {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+    font-variant: normal !important;
+    font-style: normal !important;
+    font-weight: 400 !important;
 }

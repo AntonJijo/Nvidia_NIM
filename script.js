@@ -67,7 +67,7 @@
                             <span class="code-language">${this.getLanguageDisplayName(lang)}</span>
                         </div>
                         <button class="copy-button" data-code-id="${id}" title="Copy code">
-                            <i class="fas fa-copy"></i>
+                            <i class="far fa-clone"></i>
                             <span class="copy-text">Copy code</span>
                         </button>
                     </div>
@@ -107,13 +107,15 @@
         this.sessionId = this.generateSessionId();
         this.conversationStats = null;
         this.selectedFile = null;
+        this.currentMode = 'default';
+        this.slashMenu = null;
 
         this.setupMarkdown(); // Initialize Markdown pipeline
 
         this.initializeElements();
         this.setupEventListeners();
         this.autoResizeTextarea();
-        this.checkServerStatus();
+        this.initServerHealthCheck();
         this.setupSessionControls();
 
         // Load initial conversation stats
@@ -131,17 +133,15 @@
         // Check for existing session in localStorage first
         const existingSessionId = localStorage.getItem('chatbot_session_id');
 
+
         if (existingSessionId && this._validateSessionId(existingSessionId)) {
-            console.log('Resuming existing session:', existingSessionId);
             return existingSessionId;
         }
 
         // Generate a unique session ID for conversation persistence
         const newSessionId = 'session_' + Date.now() + '_' + this._secureRandomString(16);
 
-        // Store the new session ID in localStorage
         localStorage.setItem('chatbot_session_id', newSessionId);
-        console.log('Created new session:', newSessionId);
 
         return newSessionId;
     }
@@ -153,17 +153,15 @@
         }
 
         // Check format: session_timestamp_randomstring
-        const sessionPattern = /^session_\d+_[a-f0-9]{16}$/;
+        // Random part can be 8-32 chars (Math.random gives ~11 chars, crypto gives 32)
+        const sessionPattern = /^session_\d+_[a-z0-9]{8,32}$/;
         return sessionPattern.test(sessionId);
     }
 
     createNewSession() {
         let newSessionId;
 
-        // Reuse current session if it's effectively empty (no user messages)
-        // This prevents duplicate "New Chat" entries in sidebar when switching models in a fresh chat
         if (this.sessionId && (!this.messages || this.messages.length === 0)) {
-            console.log('Reusing empty session:', this.sessionId);
             newSessionId = this.sessionId;
         } else {
             // Force create a new session and store it
@@ -172,8 +170,6 @@
 
         localStorage.setItem('chatbot_session_id', newSessionId);
         this.sessionId = newSessionId;
-
-        console.log('Forced new session creation:', newSessionId);
 
         // Clear UI immediately (synchronously)
         this.messages = [];
@@ -211,17 +207,15 @@
 
     async getConversationStats() {
         try {
-            const servers = window.location.hostname === 'antonjijo.github.io'
+            const servers = (window.location.hostname === 'antonjijo.github.io' || window.location.hostname === 'nvidia-nim.pages.dev')
                 ? ['https://nvidia-nim-bot.onrender.com', 'https://Nvidia.pythonanywhere.com']
                 : ['http://localhost:8000'];
 
             for (const serverURL of servers) {
                 try {
-                    console.log(`Fetching stats from: ${serverURL}/api/conversation/stats?session_id=${this.sessionId}`);
                     const response = await fetch(`${serverURL}/api/conversation/stats?session_id=${this.sessionId}`);
                     if (response.ok) {
                         this.conversationStats = await response.json();
-                        console.log('Stats fetched successfully:', this.conversationStats);
 
                         // Save stats to persistent storage
                         if (window.chatSaver) {
@@ -234,7 +228,7 @@
                         console.warn(`Failed to fetch stats from ${serverURL}: ${response.status}`);
                     }
                 } catch (error) {
-                    console.warn(`Failed to get stats from ${serverURL}:`, error);
+                    // Failed to get stats from server
                 }
             }
         } catch (error) {
@@ -245,9 +239,9 @@
 
     async clearConversation() {
         try {
-            const servers = window.location.hostname === 'antonjijo.github.io'
+            const servers = (window.location.hostname === 'antonjijo.github.io' || window.location.hostname === 'nvidia-nim.pages.dev')
                 ? ['https://nvidia-nim-bot.onrender.com', 'https://Nvidia.pythonanywhere.com']
-                : ['http://localhost:8000']; // DEV_MODE: Change to 5000 for production
+                : ['http://localhost:8000'];
 
             for (const serverURL of servers) {
                 try {
@@ -276,11 +270,10 @@
                         this.conversationStats = result.stats;
                         this.updateConversationStatsUI(true); // Animate reset
 
-                        console.log('Conversation cleared successfully');
                         return true;
                     }
                 } catch (error) {
-                    console.warn(`Failed to clear conversation on ${serverURL}:`, error);
+                    // Failed to clear conversation
                 }
             }
         } catch (error) {
@@ -348,6 +341,12 @@
             this.fileInput.addEventListener('change', (e) => {
                 this.handleFileSelect(e);
             });
+        }
+
+        // Initialize Slash Menu
+        this.createSlashMenu();
+        if (this.messageInput) {
+            this.messageInput.addEventListener('input', (e) => this.handleSlashInput(e));
         }
 
 
@@ -680,8 +679,6 @@
     }
 
     switchModel(newModel) {
-        console.log('Model changed to:', newModel);
-        // Update the model select value
         this.modelSelect.value = newModel;
         this.updateCustomDropdownDisplay(newModel);
 
@@ -734,15 +731,28 @@
         this.modelDropdown = document.getElementById('modelDropdown');
         this.sidebarLogoWrap = document.querySelector('.sidebar-logo-wrap');
 
+        // Centralized Sidebar Toggle Helper
+        this.toggleSidebar = (show) => {
+            if (show) {
+                this.sidebar?.classList.add('expanded');
+                this.sidebarOverlay?.classList.add('active');
+                localStorage.setItem('sidebar_expanded', 'true');
+            } else {
+                this.sidebar?.classList.remove('expanded');
+                this.sidebarOverlay?.classList.remove('active');
+                localStorage.setItem('sidebar_expanded', 'false');
+            }
+        };
+
         // Restore sidebar state (Default to Expanded on Desktop)
         if (this.sidebar) {
             const savedState = localStorage.getItem('sidebar_expanded');
             const isDesktop = window.innerWidth > 768;
 
             if (savedState === 'true' || (savedState === null && isDesktop)) {
-                this.sidebar.classList.add('expanded');
+                this.toggleSidebar(true);
             } else {
-                this.sidebar.classList.remove('expanded');
+                this.toggleSidebar(false);
             }
         }
 
@@ -750,10 +760,7 @@
         if (this.sidebarToggle) {
             this.sidebarToggle.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.sidebar?.classList.remove('expanded');
-                localStorage.setItem('sidebar_expanded', 'false');
-                // DEV_MODE: Also hide overlay on mobile
-                this.sidebarOverlay?.classList.remove('active');
+                this.toggleSidebar(false);
             });
         }
 
@@ -763,11 +770,10 @@
                 e.stopPropagation();
                 if (this.sidebar?.classList.contains('expanded')) {
                     // Sidebar is open - open external link
-                    window.open('https://antonjijo.github.io/Nvidia_NIM/', '_blank');
+                    window.open('https://nvidia-nim.pages.dev/', '_blank');
                 } else {
                     // Sidebar is closed - expand it
-                    this.sidebar?.classList.add('expanded');
-                    localStorage.setItem('sidebar_expanded', 'true');
+                    this.toggleSidebar(true);
                 }
             });
         }
@@ -782,8 +788,7 @@
 
                 if (!this.sidebar.classList.contains('expanded') &&
                     !isMenuButton && !isToggleButton && !isLogoWrap) {
-                    this.sidebar.classList.add('expanded');
-                    localStorage.setItem('sidebar_expanded', 'true');
+                    this.toggleSidebar(true);
                 }
             });
         }
@@ -791,24 +796,38 @@
         // Mobile menu button
         if (this.mobileMenuBtn) {
             this.mobileMenuBtn.addEventListener('click', () => {
-                this.sidebar?.classList.add('expanded');
-                this.sidebarOverlay?.classList.add('active');
+                this.toggleSidebar(true);
             });
         }
 
         // Sidebar overlay click to close
         if (this.sidebarOverlay) {
             this.sidebarOverlay.addEventListener('click', () => {
-                this.sidebar?.classList.remove('expanded');
-                this.sidebarOverlay?.classList.remove('active');
+                this.toggleSidebar(false);
             });
         }
+
+        // DOCUMENT CLICK LISTENER (Failsafe for mobile)
+        document.addEventListener('click', (e) => {
+            // Only relevant on mobile or when overlay should be active
+            if (window.innerWidth <= 768 && this.sidebar?.classList.contains('expanded')) {
+                // Ignore clicks inside the sidebar itself
+                if (this.sidebar.contains(e.target)) return;
+
+                // Ignore clicks on the toggle button that opened it
+                if (this.mobileMenuBtn?.contains(e.target)) return;
+
+                // Close it
+                this.toggleSidebar(false);
+            }
+        });
 
         // New chat button
         if (this.newChatBtn) {
             this.newChatBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.showNewSessionDialog();
+                if (window.innerWidth <= 768) this.toggleSidebar(false);
             });
         }
 
@@ -838,6 +857,7 @@
                     this.handleModelChange(modelValue);
                     this.modelSelector?.classList.remove('active');
                     this.modelDropdown?.classList.remove('active');
+                    if (window.innerWidth <= 768) this.toggleSidebar(false);
                 }
             });
         });
@@ -931,10 +951,7 @@
     }
 
     async loadInitialStats() {
-        console.log('Loading initial conversation stats...');
-        // Load conversation stats on page load
         const stats = await this.getConversationStats();
-        console.log('Initial stats loaded:', stats);
         if (stats) {
             this.updateConversationStatsUI();
         }
@@ -1238,86 +1255,179 @@
         return allowedImageTypes.includes(file.type) || imageExts.includes(ext);
     }
 
+    handleSlashInput(e) {
+        if (this.messageInput.value === '/') {
+            if (this.slashMenu) this.slashMenu.classList.add('visible');
+        } else {
+            // Only hide if we aren't typing a command (for now just hide if not exactly /)
+            // But user might type /s ... -> we can keep it simple: only show on exact '/'
+            if (this.slashMenu) this.slashMenu.classList.remove('visible');
+        }
+        this.autoResizeTextarea();
+    }
+
+    createSlashMenu() {
+        const inputWrapper = document.getElementById('inputWrapper');
+        if (!inputWrapper) return;
+
+        const menu = document.createElement('div');
+        menu.className = 'slash-menu';
+
+        const item = document.createElement('div');
+        item.className = 'slash-item';
+        item.innerHTML = `
+            <img src="https://img.icons8.com/ios/50/book-and-pencil.png" 
+                 alt="Study" 
+                 class="slash-item-icon">
+            <span>Study & Learn</span>
+        `;
+        item.onclick = () => this.setMode('study');
+
+        menu.appendChild(item);
+        inputWrapper.appendChild(menu);
+        this.slashMenu = menu;
+
+        // Hide menu on outside click
+        document.addEventListener('click', (e) => {
+            if (this.slashMenu && this.slashMenu.classList.contains('visible') && !this.slashMenu.contains(e.target) && e.target !== this.messageInput) {
+                this.slashMenu.classList.remove('visible');
+            }
+        });
+    }
+
+    setMode(mode) {
+        this.currentMode = mode;
+        if (this.slashMenu) this.slashMenu.classList.remove('visible');
+        this.messageInput.value = ''; // Clear slash
+        this.autoResizeTextarea();
+        this.renderModeBadge();
+        this.messageInput.focus();
+    }
+
+    renderModeBadge() {
+        // Remove existing badge
+        const wrapper = document.getElementById('inputWrapper');
+        if (!wrapper) return;
+
+        const existing = wrapper.querySelector('.mode-badge');
+        if (existing) existing.remove();
+
+        if (this.currentMode === 'study') {
+            const badge = document.createElement('div');
+            badge.className = 'mode-badge';
+            badge.title = "Click to exit Study Mode";
+            badge.onclick = () => { this.setMode('default'); };
+
+            // Premium icons8 icon + Text
+            badge.innerHTML = `
+                <img src="https://img.icons8.com/ios/50/book-and-pencil.png" 
+                     alt="Study Mode" 
+                     class="study-mode-icon">
+                <span class="study-mode-text">Study</span>
+            `;
+
+            // Insert AFTER the left actions (the + button)
+            const leftActions = wrapper.querySelector('.input-left-actions');
+            if (leftActions) {
+                leftActions.insertAdjacentElement('afterend', badge);
+            } else {
+                wrapper.prepend(badge);
+            }
+
+            wrapper.classList.add('has-mode');
+        } else {
+            wrapper.classList.remove('has-mode');
+        }
+    }
+
     showTypingIndicator() {
         if (this.isTyping) return;
         this.isTyping = true;
 
-        const typingDiv = document.createElement('div');
-        typingDiv.className = 'message bot-message typing-indicator-container';
-        typingDiv.id = 'typingIndicator';
-        typingDiv.innerHTML = `
-             <div class="message-content">
-                 <div class="typing-indicator">
-                     <span></span>
-                     <span></span>
-                     <span></span>
-                 </div>
-             </div>
-         `;
-        this.chatMessages.appendChild(typingDiv);
+        // Use premium Cognitive Indicator from AnimationController
+        this.currentTypingIndicator = window.animationController
+            ? window.animationController.showCognitiveIndicator(this.chatMessages)
+            : null;
+
         this.scrollToBottom();
     }
 
     showAnalyzingIndicator(type) {
         if (this.isAnalyzing) return;
         this.isAnalyzing = true;
-        this.isTyping = true; // functionally similar
+        this.isTyping = true;
 
-        const analyzingDiv = document.createElement('div');
-        analyzingDiv.className = 'message bot-message';
-        analyzingDiv.id = 'analyzingIndicator';
+        // Remove any existing indicator
+        const existingIndicator = document.getElementById('analyzingIndicator');
+        if (existingIndicator) existingIndicator.remove();
 
-        let icon = 'fa-file-alt';
-        let text = 'Processing...';
+        const chatMessages = document.querySelector('.chat-messages');
+        if (!chatMessages) return;
 
-        if (type === 'image') {
-            icon = 'fa-image';
-            text = 'Analyzing image...';
-        } else if (type === 'file') {
-            icon = 'fa-file-alt';
-            text = 'Analyzing file...';
-        } else if (type === 'web') {
-            icon = 'fa-globe';
-            text = 'Searching the web...';
-        } else if (type === 'wiki') {
-            icon = 'fa-globe';
-            text = 'Searching Wiki web...';
+        // Create premium processing indicator
+        const indicatorWrapper = document.createElement('div');
+        indicatorWrapper.className = 'processing-indicator';
+        indicatorWrapper.id = 'analyzingIndicator';
+
+        const isImage = type === 'image';
+        const isWiki = type === 'wiki';
+
+        let iconSrc, statusText;
+        if (isImage) {
+            iconSrc = 'https://img.icons8.com/ios/50/image-gallery.png';
+            statusText = 'Analyzing visual data';
+        } else if (isWiki) {
+            iconSrc = 'https://img.icons8.com/ios/50/search--v1.png';
+            statusText = 'Searching the web';
+        } else {
+            iconSrc = 'https://img.icons8.com/ios/50/document.png';
+            statusText = 'Processing file content';
         }
 
-        // Add message-inner wrapper to center it properly
-        analyzingDiv.innerHTML = `
-            <div class="message-inner">
-                <div class="message-content" style="display:flex; align-items:center; gap:10px;">
-                    <div class="typing-indicator" style="margin:0;">
-                         <span></span>
-                         <span></span>
-                         <span></span>
-                    </div>
-                    <span class="analyzing-text" style="font-weight:500; color:var(--text-secondary);">
-                        <i class="fas ${icon}" style="margin-right:5px;"></i> ${text}
+        indicatorWrapper.innerHTML = `
+            <div class="processing-content">
+                <div class="processing-icon-wrapper">
+                    <img src="${iconSrc}" alt="Processing" class="processing-icon">
+                    <div class="processing-ring"></div>
+                    <div class="processing-ring ring-2"></div>
+                </div>
+                <div class="processing-text-wrapper">
+                    <span class="processing-status">${statusText}</span>
+                    <span class="processing-dots">
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                        <span class="dot"></span>
                     </span>
                 </div>
             </div>
+            <div class="processing-progress">
+                <div class="processing-progress-bar"></div>
+            </div>
         `;
-        this.chatMessages.appendChild(analyzingDiv);
+
+        chatMessages.appendChild(indicatorWrapper);
         this.scrollToBottom();
     }
 
     hideAnalyzingIndicator() {
         const indicator = document.getElementById('analyzingIndicator');
         if (indicator) {
-            indicator.remove();
+            indicator.classList.add('fade-out');
+            setTimeout(() => indicator.remove(), 300);
         }
         this.isAnalyzing = false;
         this.isTyping = false;
     }
 
     hideTypingIndicator() {
-        const indicator = document.getElementById('typingIndicator');
-        if (indicator) {
-            indicator.remove();
+        if (window.animationController) {
+            window.animationController.hideCognitiveIndicator();
+        } else {
+            const indicator = document.getElementById('typingIndicator') || document.getElementById('cognitiveIndicator');
+            if (indicator) indicator.remove();
         }
         this.isTyping = false;
+        this.currentTypingIndicator = null;
     }
 
     async sendMessage() {
@@ -1345,6 +1455,15 @@
             this.addMessage(message, 'user');
         }
 
+        // Store file reference before clearing preview (for API call)
+        const fileToSend = this.selectedFile;
+        const fileContentToSend = this.selectedFileContent;
+
+        // Clear file preview immediately for better UX (file is already shown in chat)
+        if (hasFile && this.filePreviewArea) {
+            this.filePreviewArea.innerHTML = '';
+        }
+
         this.messageInput.value = '';
         this.updateCharCount();
         this.autoResizeTextarea();
@@ -1355,7 +1474,7 @@
         // Determine analysis type for UI feedback
         let analysisType = null;
         if (hasFile) {
-            analysisType = this.isImageFile(this.selectedFile) ? 'image' : 'file';
+            analysisType = this.isImageFile(fileToSend) ? 'image' : 'file';
         }
 
         // Show specific analyzing/typing indicator
@@ -1368,10 +1487,9 @@
             if (message && message.length > 5) {
                 (async () => {
                     try {
-                        const servers = [
-                            'https://nvidia-nim-bot.onrender.com',
-                            'https://Nvidia.pythonanywhere.com'
-                        ];
+                        const servers = (window.location.hostname === 'antonjijo.github.io' || window.location.hostname === 'nvidia-nim.pages.dev')
+                            ? ['https://nvidia-nim-bot.onrender.com', 'https://Nvidia.pythonanywhere.com']
+                            : ['http://localhost:8000'];
                         const serverURL = servers[0];
 
                         const checkResp = await fetch(`${serverURL}/api/classify`, {
@@ -1390,7 +1508,7 @@
                             }
                         }
                     } catch (e) {
-                        console.warn('Intent check failed', e);
+                        // Intent check failed
                     }
                 })();
             }
@@ -1413,11 +1531,10 @@
             // Show generic user-friendly error
             this.showErrorMessage(error.message || 'Unknown error occurred');
         } finally {
-            if (this.selectedFile) {
-                this.removeFile();
-            }
-            // Clear extracted text content
+            // Clean up file state (preview already cleared above for UX)
+            this.selectedFile = null;
             this.selectedFileContent = null;
+            if (this.fileInput) this.fileInput.value = '';
         }
     }
 
@@ -1489,20 +1606,19 @@
     async callNvidiaAPI(message) {
         const selectedModel = this.modelSelect.value;
 
-        // Define server URLs for Production
-        const servers = [
-            'https://nvidia-nim-bot.onrender.com',
-            'https://Nvidia.pythonanywhere.com'
-        ];
+        // Define server URLs for Production/Dev
+        const servers = (window.location.hostname === 'antonjijo.github.io' || window.location.hostname === 'nvidia-nim.pages.dev')
+            ? ['https://nvidia-nim-bot.onrender.com', 'https://Nvidia.pythonanywhere.com']
+            : ['http://localhost:8000'];
 
         let lastError = null;
+        let finalMessage = message;
 
         // Try each server in sequence until one works
         for (let i = 0; i < servers.length; i++) {
             const serverURL = servers[i];
 
             try {
-                console.log(`Attempting to connect to server ${i + 1}/${servers.length}: ${serverURL}`);
 
                 let options = {
                     method: 'POST',
@@ -1515,19 +1631,16 @@
                 if (this.selectedFile && !hasTextFileContent) {
                     // Image file - use multipart form data
                     const formData = new FormData();
-                    formData.append('message', message);
-                    formData.append('model', selectedModel);
+                    formData.append('message', finalMessage);
                     formData.append('session_id', this.sessionId);
+                    formData.append('model', selectedModel);
+                    formData.append('mode', this.currentMode); // Add mode
                     formData.append('file', this.selectedFile);
 
-
-                    // Fetch will automatically set the Content-Type to multipart/form-data with boundary
                     options.body = formData;
                 } else {
                     // Text-only OR text file with extracted content
                     options.headers = { 'Content-Type': 'application/json' };
-
-                    let finalMessage = message;
 
                     // If we have extracted text content from a file, prepend it to the message
                     if (hasTextFileContent) {
@@ -1539,7 +1652,7 @@
                         message: finalMessage,
                         model: selectedModel,
                         session_id: this.sessionId,
-
+                        mode: this.currentMode, // Send current mode (study/default)
                         max_tokens: 1024,
                         temperature: 0.7
                     });
@@ -1562,9 +1675,7 @@
                     throw new Error('NVIDIA API returned unexpected response. Please check API configuration.');
                 }
 
-                // Update conversation stats if available
                 if (data.conversation_stats) {
-                    console.log('Received conversation stats:', data.conversation_stats);
                     this.conversationStats = data.conversation_stats;
 
                     // Immediate UI update with animation
@@ -1574,8 +1685,6 @@
                     setTimeout(() => {
                         this.refreshConversationStats();
                     }, 500);
-                } else {
-                    console.warn('No conversation stats received from server');
                 }
 
                 // Success! Update status and return response
@@ -1592,25 +1701,19 @@
                     // If invalid URL, keep serverName as 'Local'
                 }
                 this.updateStatus(`Connected (${serverName})`, '#4ade80');
-                console.log(`Successfully connected to ${serverName} server: ${serverURL}`);
 
                 return botResponse;
 
             } catch (error) {
-                console.warn(`Server ${i + 1} failed (${serverURL}):`, error.message);
                 lastError = error;
 
-                // If this isn't the last server, continue to next one
                 if (i < servers.length - 1) {
-                    console.log(`Trying next server...`);
                     continue;
                 }
             }
         }
 
-        // All servers failed
         this.updateStatus('Connection Failed', '#ef4444');
-        console.error('All servers failed. Last error:', lastError);
         throw lastError || new Error('All servers are unavailable');
     }
 
@@ -1778,30 +1881,27 @@
                 });
             });
 
-            // Like button
+            // Like button - only activate on click, hide other when selected
             const likeBtn = actionsEl.querySelector('button[title="Good response"]');
+            const dislikeBtn = actionsEl.querySelector('button[title="Bad response"]');
+
             if (likeBtn) {
                 likeBtn.addEventListener('click', () => {
-                    likeBtn.classList.toggle('active');
-                    if (likeBtn.classList.contains('active')) {
-                        // Disable dislike if active
-                        const dislikeBtn = actionsEl.querySelector('button[title="Bad response"]');
-                        if (dislikeBtn) dislikeBtn.classList.remove('active');
-                        console.log('User liked the response');
+                    likeBtn.classList.add('active');
+                    // Hide the dislike button when like is selected
+                    if (dislikeBtn) {
+                        dislikeBtn.style.display = 'none';
                     }
                 });
             }
 
-            // Dislike button
-            const dislikeBtn = actionsEl.querySelector('button[title="Bad response"]');
+            // Dislike button - only activate on click, hide other when selected
             if (dislikeBtn) {
                 dislikeBtn.addEventListener('click', () => {
-                    dislikeBtn.classList.toggle('active');
-                    if (dislikeBtn.classList.contains('active')) {
-                        // Disable like if active
-                        const likeBtn = actionsEl.querySelector('button[title="Good response"]');
-                        if (likeBtn) likeBtn.classList.remove('active');
-                        console.log('User disliked the response');
+                    dislikeBtn.classList.add('active');
+                    // Hide the like button when dislike is selected
+                    if (likeBtn) {
+                        likeBtn.style.display = 'none';
                     }
                 });
             }
@@ -1863,6 +1963,11 @@
 
         this.scrollToBottom();
         this.messages.push({ role: 'assistant', content });
+
+        // Save chat after displaying message
+        if (window.chatSaver) {
+            window.chatSaver.saveCurrentChat();
+        }
     }
 
     addMessageActions(inner, content) {
@@ -1931,17 +2036,18 @@
                 if (inner && !inner.querySelector('.message-actions')) {
                     this.addMessageActions(inner, content);
                 }
+
+                // Save chat after bot response completes
+                if (window.chatSaver) {
+                    window.chatSaver.saveCurrentChat();
+                }
             }
         }, 10);
     }
 
     async typeCodeBlockContent(content, messageContent, messageDiv, processedContent) {
-        console.log('Processing code block:', { content: content.substring(0, 50) + '...', processedContentLength: processedContent.length });
-
-        // Show the complete structure immediately (header, etc.)
         this.safeSetHTML(messageContent, processedContent);
 
-        console.log('Message content after setting HTML:', messageContent.innerHTML.substring(0, 200) + '...');
 
         // Extract ALL code blocks from content
         const codeBlockRegex = /```(\w +) ?\s *\n ? ([\s\S] *?)```/g;
@@ -1955,23 +2061,20 @@
         }
 
         if (codeBlocks.length === 0) {
-            console.log('No code blocks found, falling back to regular text');
             this.typeRegularText(content, messageContent, messageDiv, processedContent);
             return;
         }
 
-        console.log('Found', codeBlocks.length, 'code blocks');
-
-        // Find all content containers to type into
         const contentContainers = messageContent.querySelectorAll('.code-content');
 
-        console.log('Content containers found:', { count: contentContainers.length });
-
         if (contentContainers.length === 0) {
-            console.log('No containers found, keeping as-is');
             this.attachCopyListeners(messageContent);
             this.hideTypingIndicator();
             this.messages.push({ role: 'assistant', content });
+            // Save chat after bot response
+            if (window.chatSaver) {
+                window.chatSaver.saveCurrentChat();
+            }
             return;
         }
 
@@ -1989,24 +2092,20 @@
 
         const typeNextBlock = () => {
             if (currentBlockIndex >= codeBlocks.length || currentBlockIndex >= contentContainers.length) {
-                // All blocks completed
-                console.log('All code blocks completed');
                 this.attachCopyListeners(messageContent);
                 this.scrollToBottom();
                 this.hideTypingIndicator();
                 this.messages.push({ role: 'assistant', content: originalContent });
+                // Save chat after bot response
+                if (window.chatSaver) {
+                    window.chatSaver.saveCurrentChat();
+                }
                 return;
             }
 
             const codeBlock = codeBlocks[currentBlockIndex];
             const container = contentContainers[currentBlockIndex];
 
-            console.log(`Typing block ${currentBlockIndex + 1}/${codeBlocks.length}:`, {
-                language: codeBlock.language,
-                codeLength: codeBlock.code.length
-            });
-
-            // Type this block
             let currentText = '';
             let currentIndex = 0;
 
@@ -2022,12 +2121,9 @@
                     currentIndex++;
                     container.textContent = currentText;
                     this.scrollToBottom();
-                } else {
                     clearInterval(this.currentTypingInterval);
                     this.currentTypingInterval = null;
 
-                    // Apply syntax highlighting when this block is complete
-                    console.log(`Applying syntax highlighting for block ${currentBlockIndex + 1}, language:`, codeBlock.language);
                     this.applySafeHighlighting(container, codeBlock.language);
 
                     // Move to next block
@@ -2288,26 +2384,19 @@
     }
 
     updateConversationStatsUI(animate = false) {
-        console.log('updateConversationStatsUI called with stats:', this.conversationStats);
-
         if (!this.conversationStats) {
-            // Treat as 0 tokens instead of hiding completely to allow animation
-            // console.log('No conversation stats available, defaulting to 0');
+            // Default to 0 tokens if no stats
         }
 
         const stats = this.conversationStats || { total_tokens: 0, max_tokens: 128000, utilization_percent: 0, current_model: null };
         const { total_tokens, displayed_tokens, max_tokens, utilization_percent, current_model } = stats;
-        // Use displayed_tokens (user content only) if available, otherwise total
-        const tokensToDisplay = displayed_tokens !== undefined ? displayed_tokens : total_tokens;
 
-        console.log('Stats details:', { total_tokens, displayed_tokens, max_tokens, utilization_percent, current_model });
-
-        // DEV_MODE: Update header context info
+        // Update header context info
         if (this.contextInfo && this.contextValue) {
             this.contextInfo.style.display = 'flex';
 
             const startTokens = this.currentStatsTokens || 0;
-            const endTokens = tokensToDisplay || 0;
+            const endTokens = displayed_tokens || 0;
             this.currentStatsTokens = endTokens;
 
             if (animate && startTokens !== endTokens) {
@@ -2323,10 +2412,7 @@
             else this.contextValue.style.color = ''; // remove inline style to use CSS default
         }
 
-        // Show loader even with 0 tokens if we have valid stats and a model
-        // This allows users to see that stats tracking is working
         if (!current_model) {
-            console.log('No current model, hiding stats');
             const statsElement = document.getElementById('conversationStats');
             if (statsElement) {
                 statsElement.style.display = 'none';
@@ -2455,7 +2541,6 @@
     async refreshConversationStats() {
         const stats = await this.getConversationStats();
         if (stats) {
-            console.log('Refreshed stats from server:', stats);
             this.updateConversationStatsUI(true);
         }
     }
@@ -2472,7 +2557,7 @@
             this.statusPing.setAttribute('aria-label', text);
         }
 
-        // DEV_MODE: Update status text display
+        // Update status text display
         if (this.statusText) {
             this.statusText.textContent = text;
             if (isGreen) this.statusText.style.color = '#34d399';
@@ -2592,54 +2677,93 @@
         }, 3000);
     }
 
+    // SERVER HEALTH STATE MACHINE
+    initServerHealthCheck() {
+        this.serverState = 'unknown'; // unknown, checking, online, degraded, offline
+        this.healthCheckInterval = null;
+        this.connectedServer = null;
+
+        // Start polling
+        this.checkServerStatus();
+        this.healthCheckInterval = setInterval(() => this.checkServerStatus(), 30000); // Check every 30s
+    }
+
     async checkServerStatus() {
+        // Transition to checking state if currently unknown or offline
+        if (this.serverState === 'unknown' || this.serverState === 'offline') {
+            this.serverState = 'checking';
+            this.updateStatus('Checking...', '#fbbf24'); // Yellow
+        }
+
         try {
             // Define server URLs with primary and failover
-            const servers = window.location.hostname === 'antonjijo.github.io'
+            const servers = (window.location.hostname === 'antonjijo.github.io' || window.location.hostname === 'nvidia-nim.pages.dev')
                 ? [
                     'https://nvidia-nim-bot.onrender.com',  // Primary server (Render)
                     'https://Nvidia.pythonanywhere.com'     // Failover server (PythonAnywhere)
                 ]
-                : ['http://localhost:8000'];  // DEV_MODE: Change to 5000 for production
+                : ['http://localhost:8000'];
 
             let connected = false;
-            let connectedServer = '';
+            let currentServerName = '';
 
-            // Try each server in sequence until one works
+            // Try each server in sequence
             for (let i = 0; i < servers.length; i++) {
                 const serverURL = servers[i];
 
                 try {
-                    console.log(`Checking server ${i + 1}/${servers.length}: ${serverURL}`);
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 5000);
 
                     const response = await fetch(`${serverURL}/health`, {
-                        timeout: 5000  // 5 second timeout for health check
+                        signal: controller.signal
                     });
+
+                    clearTimeout(timeoutId);
 
                     if (response.ok) {
                         connected = true;
                         const serverHost = (new URL(serverURL)).hostname;
-                        const serverName = serverHost === 'nvidia-nim-bot.onrender.com' ? 'Primary' :
-                            (serverHost === 'nvidia.pythonanywhere.com' ||
-                                serverHost.endsWith('.pythonanywhere.com')) ? 'Failover' : 'Local';
-                        connectedServer = serverName;
-                        console.log(`Server ${serverName} is online: ${serverURL}`);
-                        break; // Found working server, stop checking
+                        currentServerName = serverHost.includes('render') ? 'Primary' :
+                            (serverHost.includes('pythonanywhere') ? 'Failover' : 'Local');
+
+                        if (this.connectedServer !== currentServerName || this.serverState !== 'online') {
+                            // Server connected
+                        }
+
+                        this.connectedServer = currentServerName;
+                        break;
                     }
                 } catch (error) {
-                    console.warn(`Server ${i + 1} health check failed (${serverURL}):`, error.message);
-                    // Continue to next server
+                    // Silent fail for individual servers
                 }
             }
 
+            // Update State & UI
             if (connected) {
-                this.updateStatus(`Ready (${connectedServer})`, '#4ade80');
+                if (this.serverState !== 'online') {
+                    this.serverState = 'online';
+                    this.updateStatus(`Ready (${this.connectedServer})`, '#4ade80');
+                    if (this.statusPingInner) {
+                        this.statusPingInner.style.backgroundColor = '#4ade80';
+                        this.statusPingInner.style.boxShadow = '0 0 10px #4ade80';
+                    }
+                }
             } else {
-                this.updateStatus('All Servers Offline', '#ef4444');
+                // Only show offline if we failed after a valid check
+                if (this.serverState !== 'offline') {
+                    this.serverState = 'offline';
+                    this.updateStatus('All Servers Offline', '#ef4444');
+                    if (this.statusPingInner) {
+                        this.statusPingInner.style.backgroundColor = '#ef4444';
+                        this.statusPingInner.style.boxShadow = 'none';
+                    }
+                }
             }
 
         } catch (error) {
-            console.error('Health check error:', error);
+            console.error('Health check fatal error:', error);
+            this.serverState = 'offline';
             this.updateStatus('Connection Error', '#ef4444');
         }
     }
@@ -2689,7 +2813,6 @@
     }
 
     toggleDropdown() {
-        // DEV_MODE: Fixed property name
         const isActive = this.modelDropdown?.classList.contains('active');
         if (isActive) {
             this.closeDropdown();
@@ -2698,7 +2821,6 @@
         }
     }
 
-    // DEV_MODE: Fixed property names matching initializeChatGPTUI
     openDropdown() {
         this.modelSelector?.classList.add('active');
         this.modelDropdown?.classList.add('active');
@@ -2824,7 +2946,6 @@
             try {
                 const text = await this.readTextFile(file);
                 this.selectedFileContent = text;
-                console.log(`Text file extracted on frontend (${text.length} chars)`);
             } catch (error) {
                 console.error('Failed to read text file:', error);
                 this.showErrorPopup('Failed to read text file');
@@ -2857,7 +2978,6 @@
             if (item.kind === 'file') {
                 const blob = item.getAsFile();
                 if (blob) {
-                    console.log('Paste detected:', blob.name, blob.type);
 
                     // Fix: Clipboard files usually have generic names like "image.png"
                     // If name is missing or "image.png", let's ensure it's treated correctly
@@ -2967,7 +3087,6 @@
             this.micBtn.classList.add('recording');
             this.micBtn.title = 'Listening... Click to stop';
             this.savedInputValue = this.messageInput.value; // Save current value
-            console.log('Voice recognition started');
         };
 
         this.recognition.onresult = (event) => {
@@ -3000,7 +3119,6 @@
             // Update saved value when we get final results
             if (finalTranscript) {
                 this.savedInputValue = this.savedInputValue + (this.savedInputValue ? ' ' : '') + finalTranscript.trim();
-                console.log('Final transcript:', finalTranscript);
             }
 
             this.updateCharCount();
@@ -3009,7 +3127,6 @@
 
             // Set timeout to stop after silence
             this.silenceTimeout = setTimeout(() => {
-                console.log('Silence detected, stopping...');
                 this.stopVoiceInput();
             }, this.silenceDelay);
         };
@@ -3075,3 +3192,5 @@
 document.addEventListener('DOMContentLoaded', () => {
     window.chatbot = new Chatbot();
 });
+
+

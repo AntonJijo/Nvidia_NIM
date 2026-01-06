@@ -20,24 +20,59 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Configure CORS with more restrictive settings
-# Configure CORS for Production
+# Security: Max request size (10MB) to prevent DoS
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB max upload
+
+# Production Origins (no localhost)
+PRODUCTION_ORIGINS = [
+    "https://antonjijo.github.io",
+    "https://nvidia-nim.pages.dev",
+    "https://nvidia-nim-bot.onrender.com",
+    "https://Nvidia.pythonanywhere.com"
+]
+
+# Add localhost only if running in development
+IS_PRODUCTION = os.getenv('FLASK_ENV') == 'production' or os.getenv('RENDER') is not None
+ALLOWED_ORIGINS = PRODUCTION_ORIGINS if IS_PRODUCTION else PRODUCTION_ORIGINS + [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:5500",
+    "http://127.0.0.1:5500"
+]
+
+# Configure CORS
 CORS(app, 
-     origins=[
-         "https://antonjijo.github.io",
-         "https://nvidia-nim.pages.dev",
-         "https://nvidia-nim-bot.onrender.com",
-         "https://Nvidia.pythonanywhere.com"
-     ],
+     origins=ALLOWED_ORIGINS,
      methods=["GET", "POST"],
      allow_headers=["Content-Type", "X-API-KEY"],
      supports_credentials=False
 )
 
+# Security: Add security headers to all responses
+@app.after_request
+def add_security_headers(response):
+    """Add security headers to all responses."""
+    # Prevent MIME type sniffing
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    # Prevent clickjacking
+    response.headers['X-Frame-Options'] = 'DENY'
+    # XSS protection (legacy browsers)
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    # Referrer policy for privacy
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    # Permissions policy to restrict browser features
+    response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+    return response
+
 # API keys from environment
 NVIDIA_API_KEY = os.getenv('NVIDIA_API_KEY')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 EXPORT_KEY = os.getenv('EXPORT_KEY')
+TAVILY_API_KEY = os.getenv('TAVILY_API_KEY')
+
+# Initialize Tavily client
+from tavily import TavilyClient
+tavily_client = TavilyClient(TAVILY_API_KEY) if TAVILY_API_KEY else None
 
 # ============================================
 # MODEL REGISTRY (CORE ROUTING LOGIC)
@@ -159,8 +194,8 @@ def validate_message_content(message):
     if len(message.strip()) == 0:
         return False, "Message cannot be empty"
     
-    # Check for suspicious patterns
-    suspicious_patterns = [
+    # Check for XSS patterns
+    xss_patterns = [
         r'<script[^>]*>',
         r'javascript:',
         r'vbscript:',
@@ -173,9 +208,30 @@ def validate_message_content(message):
         r'<style[^>]*>'
     ]
     
-    for pattern in suspicious_patterns:
+    for pattern in xss_patterns:
         if re.search(pattern, message, re.IGNORECASE):
             return False, "Message contains potentially dangerous content"
+    
+    # Prompt injection detection (log but don't block to avoid false positives)
+    # These are monitored but allowed since users may legitimately discuss AI
+    prompt_injection_patterns = [
+        r'ignore\s+(all\s+)?(previous|prior|above)\s+(instructions?|prompts?|rules?)',
+        r'disregard\s+(all\s+)?(previous|prior|above)',
+        r'forget\s+(everything|all|your)\s+(instructions?|rules?|training)',
+        r'you\s+are\s+now\s+(a|an|in)\s+\w+\s+mode',
+        r'new\s+instruction[s]?:',
+        r'system\s*:\s*',
+        r'\[system\]',
+        r'<\|system\|>',
+        r'###\s*(system|instruction)',
+    ]
+    
+    message_lower = message.lower()
+    for pattern in prompt_injection_patterns:
+        if re.search(pattern, message_lower, re.IGNORECASE):
+            # Log potential injection attempt (but don't block - could be false positive)
+            # In production, you might want to log this to a security monitoring system
+            pass
     
     return True, "Valid"
 
@@ -207,56 +263,50 @@ def validate_request_origin():
     origin = request.headers.get('Origin')
     referer = request.headers.get('Referer')
     
-    allowed_origins = [
-        "https://antonjijo.github.io",
-        "https://nvidia-nim.pages.dev",
-        "https://nvidia-nim-bot.onrender.com",
-        "https://Nvidia.pythonanywhere.com"
-    ]
-    
+    # Use global ALLOWED_ORIGINS (defined based on environment)
     # Check origin header
-    if origin and origin not in allowed_origins:
+    if origin and origin not in ALLOWED_ORIGINS:
         return False
     
     # Check referer header as fallback
     if not origin and referer:
-        for allowed in allowed_origins:
+        for allowed in ALLOWED_ORIGINS:
             if referer.startswith(allowed):
                 return True
         return False
     
-    # Allow requests without origin/referer (e.g., direct API calls)
+    # Allow requests without origin/referer (e.g., direct API calls in dev)
+    # In production, this should be more restrictive
     return True
 
 def log_session_details(session_id, user_message, selected_model, conversation_messages, api_response=None, error=None):
-    """Append session info to chat_logs.jsonl"""
+    """
+    Append session info to chat_logs.jsonl
+    NOTE: In production, consider disabling logging or using anonymized data
+    """
+    # Option to disable logging in production (set DISABLE_CHAT_LOGGING=true)
+    if os.getenv('DISABLE_CHAT_LOGGING', 'false').lower() == 'true':
+        return
+    
+    # Truncate user message for privacy (only log first 100 chars)
+    user_preview = user_message[:100] + "..." if len(user_message) > 100 else user_message
+    
     log_entry = {
         "timestamp": datetime.utcnow().isoformat() + "Z",
-        "session_id": session_id,
+        "session_id": session_id[:20] + "..." if len(session_id) > 20 else session_id,  # Truncate session ID
         "model": selected_model,
-        "user_prompt": user_message,
-        "conversation_context": [
-            {
-                "role": msg["role"],
-                "content_preview": msg["content"][:100] + "..." if len(msg["content"]) > 100 else msg["content"],
-                "content_length": len(msg["content"]),
-                "is_summary": msg.get("metadata", {}).get("is_summary", False) if "metadata" in msg else False
-            }
-            for msg in conversation_messages
-        ]
+        "user_prompt_preview": user_preview,  # Only preview, not full prompt
+        "user_prompt_length": len(user_message),  # Log length instead of full content
+        "conversation_turns": len(conversation_messages),  # Just count, not content
     }
 
     if api_response:
-        ai_content = api_response.get('choices', [{}])[0].get('message', {}).get('content', '')
-        log_entry["ai_response"] = {"content": ai_content[:200] + "...", "status": "success"}
-        log_entry["ai_response_text"] = ai_content
+        log_entry["status"] = "success"
+        log_entry["response_length"] = len(api_response.get('choices', [{}])[0].get('message', {}).get('content', ''))
     elif error:
-        log_entry["ai_response"] = {"error": str(error), "status": "error"}
-        log_entry["ai_response_text"] = f"Error: {str(error)}"
-
-    # Save to file
-    # Production: Always write to log
-
+        # Don't log full error details in case they contain sensitive info
+        log_entry["status"] = "error"
+        log_entry["error_type"] = type(error).__name__ if hasattr(error, '__class__') else "Unknown"
 
     try:
         with open("chat_logs.jsonl", "a", encoding="utf-8") as f:
@@ -314,7 +364,6 @@ def stage_1_analyze(file_storage, file_type):
         
         # Check cache
         if file_hash in ANALYSIS_CACHE:
-            print(f"Stage 1: Cache hit for {file_hash}")
             return ANALYSIS_CACHE[file_hash]
 
         content = ""
@@ -393,7 +442,6 @@ def stage_1_analyze(file_storage, file_type):
             "temperature": 0.7
         }
 
-        print("Stage 1: Calling NVIDIA Nemotron Nano VL (OpenRouter)...")
         # Increase timeout for Stage 1
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
@@ -402,15 +450,12 @@ def stage_1_analyze(file_storage, file_type):
             timeout=60
         )
         
-        print(f"Stage 1: Response status: {response.status_code}")
-        
         # Parse response
         result = response.json()
         
         # Check for errors first
         if 'error' in result:
             error_msg = result['error']
-            print(f"Stage 1 API Error: {json.dumps(error_msg, indent=2)}")
             return f"Error analyzing file: {error_msg.get('message', str(error_msg))}"
         
         # Check for successful response
@@ -422,13 +467,9 @@ def stage_1_analyze(file_storage, file_type):
             
             return analysis
         else:
-            print(f"Stage 1 Unexpected Response: {json.dumps(result, indent=2)}")
             return f"Error analyzing file: Unexpected response format (status: {response.status_code})"
 
     except Exception as e:
-        print(f"Stage 1 Exception: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return f"Analysis failed: {str(e)}"
 
 # ---------------------
@@ -437,114 +478,430 @@ def stage_1_analyze(file_storage, file_type):
 # ============================================
 
 WEB_DECISION_SYSTEM_PROMPT = """
-You are a strict intent classifier.
+You are an autonomous large language model operating in a constrained environment
+where access to live internet data ("WEB MODE") is expensive and must only be used
+when absolutely necessary.
 
-Your task is to decide whether answering the user query REQUIRES
-external, up-to-date, or real-time web information.
+Your primary objective is to produce correct, high-quality answers while minimizing
+unnecessary web usage.
 
-You DO NOT browse the web.
-You DO NOT answer the question.
-You ONLY decide.
+You MUST decide, for every user request, whether WEB MODE is REQUIRED or NOT REQUIRED.
 
-Return EXACTLY one of these tokens:
+You are NOT allowed to guess current facts.
+You are NOT allowed to hallucinate up-to-date information.
+You are NOT allowed to browse unless explicitly justified.
+
+You must strictly follow the rules below.
+
+----------------------------------------------------------------
+SECTION 1 — DEFINITIONS
+----------------------------------------------------------------
+
+Definition: WEB MODE
+WEB MODE means querying live internet sources via an external search API.
+
+Definition: OFFLINE MODE
+OFFLINE MODE means answering using only your internal knowledge, reasoning,
+and logical inference without any internet access.
+
+Definition: CURRENT INFORMATION
+Any information that may change after your training cutoff, including but not limited to:
+- News
+- Prices
+- Versions
+- API limits
+- Company policies
+- Availability
+- Releases
+- Events
+- Laws
+- Regulations
+- Rankings
+- Metrics
+- Status pages
+
+Definition: STATIC INFORMATION
+Information that is unlikely to change over time, including but not limited to:
+- Mathematics
+- Algorithms
+- Programming syntax
+- Computer science fundamentals
+- Physics laws
+- Chemistry principles
+- Historical facts (before cutoff)
+- Definitions
+- Conceptual explanations
+
+----------------------------------------------------------------
+SECTION 2 — CORE DECISION PRINCIPLE
+----------------------------------------------------------------
+
+You MUST use WEB MODE if and only if at least one of the following is true:
+
+1. The question requires CURRENT INFORMATION.
+2. The question asks for verification of real-world status.
+3. The question references "latest", "current", "today", "now", "recent", or similar.
+4. The question involves prices, limits, quotas, availability, or plans.
+5. The question involves live systems, APIs, services, or companies where facts change.
+6. The question cannot be answered confidently without external verification.
+7. Incorrect information would cause practical harm or mislead the user.
+
+If NONE of the above conditions are true, you MUST NOT use WEB MODE.
+
+----------------------------------------------------------------
+SECTION 3 — STRONG DO NOT USE WEB MODE CONDITIONS
+----------------------------------------------------------------
+
+You MUST NOT use WEB MODE when:
+
+- The user asks for:
+  - Code examples
+  - Algorithms
+  - Pseudocode
+  - Programming explanations
+  - System design concepts
+  - Math solutions
+  - Logical reasoning
+  - Best practices
+  - General comparisons without time sensitivity
+  - Hypotheticals
+  - Opinions
+  - Conceptual architecture
+  - Prompts
+  - Policies
+  - Heuristics
+  - Design patterns
+
+- The answer can be derived purely from reasoning.
+
+- The user does NOT explicitly or implicitly request up-to-date facts.
+
+- The answer is generic and timeless.
+
+----------------------------------------------------------------
+SECTION 4 — STRONG MUST USE WEB MODE CONDITIONS
+----------------------------------------------------------------
+
+You MUST use WEB MODE when:
+
+- The user asks:
+  - "What is the current…"
+  - "How much does X cost"
+  - "What is the limit of X"
+  - "Is X available"
+  - "Who is the CEO now"
+  - "What happened today"
+  - "Latest version"
+  - "Current API quota"
+  - "Monthly limits"
+  - "Pricing"
+  - "Plans"
+  - "Status"
+  - "Is this still free"
+
+- The question includes uncertainty indicators:
+  - "Still"
+  - "Currently"
+  - "As of now"
+  - "Right now"
+
+- The topic involves:
+  - SaaS platforms
+  - APIs
+  - Cloud services
+  - AI tools
+  - Web services
+  - Regulations
+  - Market data
+
+----------------------------------------------------------------
+SECTION 5 — CONFIDENCE TEST
+----------------------------------------------------------------
+
+Before answering, you MUST internally ask:
+
+"Can I answer this with at least 95% confidence without web access?"
+
+If the answer is NO → USE WEB MODE.
+If the answer is YES → DO NOT USE WEB MODE.
+
+----------------------------------------------------------------
+SECTION 6 — ACCURACY OVERRIDE RULE
+----------------------------------------------------------------
+
+If providing an incorrect answer would:
+
+- Mislead implementation
+- Cause wasted money
+- Break a system
+- Cause incorrect configuration
+- Affect production behavior
+
+Then WEB MODE is REQUIRED.
+
+----------------------------------------------------------------
+SECTION 7 — USER INTENT INTERPRETATION
+----------------------------------------------------------------
+
+You must infer intent, not just keywords.
+
+Example:
+- "Explain how pricing works" → OFFLINE MODE
+- "What is the price today" → WEB MODE
+
+Example:
+- "What is Tavily" → OFFLINE MODE
+- "What is Tavily's monthly limit" → WEB MODE
+
+----------------------------------------------------------------
+SECTION 8 — RESPONSE FORMAT CONTROL
+----------------------------------------------------------------
+
+You MUST internally decide one of the following:
+
+DECISION = WEB_REQUIRED
+DECISION = WEB_NOT_REQUIRED
+
+If WEB_REQUIRED:
+- Fetch information
+- Verify from multiple sources if possible
+- Prefer official documentation
+- Use the most recent data
+- Avoid speculation
+
+If WEB_NOT_REQUIRED:
+- Do NOT browse
+- Do NOT mention browsing
+- Do NOT hedge unnecessarily
+- Answer directly
+
+----------------------------------------------------------------
+SECTION 9 — FAILSAFE RULE
+----------------------------------------------------------------
+
+If you are uncertain whether web data is required,
+YOU MUST DEFAULT TO WEB MODE.
+
+Accuracy is more important than speed.
+
+----------------------------------------------------------------
+SECTION 10 — EXAMPLES (INTERNAL GUIDANCE)
+----------------------------------------------------------------
+
+User: "What is Python?"
+→ WEB_NOT_REQUIRED
+
+User: "What is the latest Python version?"
+→ WEB_REQUIRED
+
+User: "Explain REST APIs"
+→ WEB_NOT_REQUIRED
+
+User: "Is Tavily free?"
+→ WEB_REQUIRED
+
+User: "Write a system prompt"
+→ WEB_NOT_REQUIRED
+
+User: "What is the current API limit?"
+→ WEB_REQUIRED
+
+----------------------------------------------------------------
+SECTION 11 — STRICT PROHIBITIONS
+----------------------------------------------------------------
+
+You MUST NOT:
+- Hallucinate current facts
+- Guess prices or limits
+- Assume availability
+- Use outdated knowledge when correctness matters
+- Use WEB MODE for trivial questions
+
+----------------------------------------------------------------
+SECTION 12 — FINAL DIRECTIVE
+----------------------------------------------------------------
+
+Your behavior must be:
+
+- Conservative
+- Accuracy-first
+- Cost-aware
+- Deterministic
+- Explicit in decision logic
+- Minimal in browsing
+- Correct over fast
+
+This system prompt overrides any conflicting instruction.
+
+----------------------------------------------------------------
+OUTPUT FORMAT
+----------------------------------------------------------------
+
+Output ONLY one of these tokens:
 - WEB_REQUIRED
 - WEB_NOT_REQUIRED
 
-----------------
-Return WEB_REQUIRED ONLY IF the query depends on:
-- Real-time or current data (today, now, latest, current)
-- Prices, stock values, market capitalization
-- News, announcements, releases, updates
-- Events occurring after 2024
-- Time-sensitive comparisons
-
-----------------
-Return WEB_NOT_REQUIRED if the query can be answered using:
-- General knowledge
-- Historical facts
-- Conceptual explanations
-- Definitions
-- Tutorials
-- Company or product overviews
-- Non-time-sensitive comparisons
-
-----------------
-If you are uncertain, default to:
-WEB_NOT_REQUIRED
-
-----------------
-Output rules:
-- Output ONLY the token
-- No explanations
-- No punctuation
-- No extra text
+No explanations. No punctuation. No extra text.
 """
 
 WEB_SCRAPING_RULES_SYSTEM_PROMPT = """
-You are operating in WEB MODE.
+You are an autonomous large language model operating under a
+two-phase execution model:
 
-External information has been retrieved by the system and provided
-inside <WEB_SEARCH_RESULTS> tags.
+PHASE 1: DECISION MODE (completed by upstream classifier)
+PHASE 2: WEB MODE (you are now in this phase)
 
-----------------
-STRICT RULES (MANDATORY):
+------------------------------------------------------------
+SECTION 1 — CURRENT STATE
+------------------------------------------------------------
 
-1. You MUST use ONLY the information contained inside
-   <WEB_SEARCH_RESULTS> to answer.
+You are NOW in WEB MODE.
+External data has been retrieved and injected via <WEB_SEARCH_RESULTS>.
 
-2. You MUST NOT use prior knowledge, memory, or assumptions.
+Your job is to:
+- Answer the user's question NATURALLY and CONVERSATIONALLY
+- Use ONLY the information from <WEB_SEARCH_RESULTS>
+- Sound like a helpful, friendly assistant — NOT a data dump
+- Provide context, explanation, and helpful insights
 
-3. You MUST NOT invent facts, dates, numbers, events, or rankings.
+------------------------------------------------------------
+SECTION 2 — CONVERSATIONAL RESPONSE GUIDELINES
+------------------------------------------------------------
 
-4. If the answer is NOT clearly present in the retrieved data,
-   you MUST say:
-   "Not found in retrieved sources."
+You MUST respond like a normal chat assistant:
 
-5. You MUST NOT speculate or extrapolate beyond the sources.
+✓ Use natural language and complete sentences
+✓ Provide context around the data
+✓ Explain what the data means if helpful
+✓ Add relevant insights or observations
+✓ Use appropriate formatting (headers, bullets) when helpful
+✓ Be warm, engaging, and helpful in tone
 
-6. You MUST NOT mention training data, knowledge cutoff,
-   or claim to browse the internet.
+You MUST NOT:
 
-----------------
-Allowed actions:
-- Summarize retrieved facts
-- Combine retrieved facts
-- Rephrase retrieved facts
+✗ Just dump raw data with no context
+✗ Use cold, robotic bullet lists only
+✗ Say "According to retrieved sources:" as your opener
+✗ Format responses like a database query result
+✗ Be overly formal or stiff
 
-----------------
-Forbidden actions:
-- Guessing
-- Filling gaps
-- Predicting future events
-- Stating confidence without evidence
+Example BAD response:
+"Bitcoin Price: $93,658.00 USD. Source: TradingView."
 
-----------------
-Your credibility depends entirely on source fidelity.
+Example GOOD response:
+"Bitcoin is currently trading at around **$93,658** 📈 
+It's been relatively stable over the past 24 hours with a slight uptick of about 0.57%. 
+If you're looking to buy or trade, major exchanges like Kraken are showing similar prices."
+
+------------------------------------------------------------
+SECTION 3 — SOURCE FIDELITY (STILL MANDATORY)
+------------------------------------------------------------
+
+While being conversational, you MUST still:
+
+1. Use ONLY facts from <WEB_SEARCH_RESULTS>
+2. NOT invent additional facts, dates, or numbers
+3. NOT use prior knowledge to fill gaps
+4. NOT speculate beyond what sources say
+5. Acknowledge uncertainty if sources conflict
+
+If information is missing or unclear:
+- Be honest about it naturally
+- Don't force an answer
+
+------------------------------------------------------------
+SECTION 4 — LANGUAGE CONTROL
+------------------------------------------------------------
+
+You MUST NOT mention:
+- "browsing", "searching", "web search", "scraping"
+- "training data", "knowledge cutoff"
+- "retrieved sources" (in formal way)
+- Any technical backend terms
+
+You MAY naturally reference:
+- "current data shows..."
+- "from what I can see..."
+- "the latest info indicates..."
+
+------------------------------------------------------------
+SECTION 5 — RESPONSE STYLE PRIORITY
+------------------------------------------------------------
+
+1. Be HELPFUL and NATURAL first
+2. Be ACCURATE (from sources only)
+3. Be CONVERSATIONAL
+4. Be CONCISE but not terse
+5. Add PERSONALITY appropriate to the question
+
+------------------------------------------------------------
+SECTION 6 — CONFLICT AND UNCERTAINTY
+------------------------------------------------------------
+
+If sources conflict:
+- Mention both perspectives naturally
+- Don't hide uncertainty
+
+If data is insufficient:
+- Answer what you can
+- Be honest about limitations conversationally
+- Example: "I can see the current price, but I'm not finding historical data for comparison."
+
+------------------------------------------------------------
+FINAL DIRECTIVE
+------------------------------------------------------------
+
+You are a friendly, knowledgeable assistant who happens to have 
+access to fresh, real-time information. 
+
+Respond like you're having a helpful conversation — NOT like 
+you're reading from a search results page.
+
+Be accurate. Be natural. Be helpful.
 """
 
 WEB_MODE_LIMIT_SYSTEM_PROMPT = """
-Web mode was requested, but no reliable external information
-is available due to system limits or missing sources.
+Web search was attempted, but no reliable information was found.
 
-----------------
-Rules:
+------------------------------------------------------------
+RESPONSE GUIDELINES
+------------------------------------------------------------
 
-1. You MUST NOT invent or approximate information.
-2. You MUST NOT answer from memory.
-3. You MUST clearly state that web data is unavailable.
-4. You MAY provide general background only if explicitly asked.
-5. Otherwise, respond with a limitation notice.
+Be honest and natural about the limitation:
 
-----------------
-Required phrasing (use exactly):
+✓ Acknowledge you couldn't find reliable current data
+✓ Be conversational, not robotic
+✓ Offer to help in another way if appropriate
+✓ Keep it brief and graceful
 
-"Web mode is currently unavailable or returned no reliable sources.
-I cannot provide a verified answer at this time."
+You MUST NOT:
+- Make up information
+- Use prior knowledge to answer factual questions
+- Pretend you have data you don't
 
-----------------
-Do NOT apologize excessively.
-Do NOT speculate.
-Do NOT provide links unless explicitly given.
+------------------------------------------------------------
+EXAMPLE RESPONSES
+------------------------------------------------------------
+
+GOOD: "I tried to find the latest info on that, but I'm not 
+getting reliable results right now. Is there something else 
+I can help with, or would you like me to try a different angle?"
+
+GOOD: "Hmm, I couldn't pull up current data on that. If you 
+have a specific source in mind, feel free to share it and 
+I can help analyze it!"
+
+BAD: "Web mode is currently unavailable or returned no reliable 
+sources. I cannot provide a verified answer at this time."
+
+------------------------------------------------------------
+TONE
+------------------------------------------------------------
+
+- Warm and helpful
+- Honest about limitations
+- Not overly apologetic
+- Offer alternatives when natural
 """
 
 def classify_query(query):
@@ -576,77 +933,71 @@ def classify_query(query):
         
         if response.status_code == 200:
             res_text = response.json()['choices'][0]['message']['content'].strip()
-            print(f"DEBUG: Classifier Output: {res_text}")
             return "WEB_REQUIRED" in res_text
-    except Exception as e:
-        print(f"Classifier Error: {e}")
+    except Exception:
+        pass
     
     return False
 
-def perform_wikipedia_search(query):
+def perform_tavily_search(query):
     """
-    Search Wikipedia API for reliable, structured knowledge.
-    Uses generic 'requests' to avoid extra dependencies.
+    Perform web search using Tavily API for reliable, up-to-date information.
+    Returns structured search results with answer and raw content.
     """
+    if not tavily_client:
+        return None
+    
     try:
-        print(f"DEBUG: Checking Wikipedia for: {query}")
-        # 1. Search for title
-        search_url = "https://en.wikipedia.org/w/api.php"
-        search_params = {
-            "action": "query",
-            "format": "json",
-            "list": "search",
-            "srsearch": query,
-            "srlimit": 1
-        }
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
+        response = tavily_client.search(
+            query=query,
+            include_answer="basic",
+            search_depth="basic",
+            include_raw_content="markdown"
+        )
         
-        resp = requests.get(search_url, params=search_params, headers=headers, timeout=5)
-        data = resp.json()
-        
-        if not data.get("query", {}).get("search"):
+        if not response:
             return None
-            
-        title = data["query"]["search"][0]["title"]
         
-        # 2. Get Summary
-        summary_params = {
-            "action": "query",
-            "format": "json",
-            "prop": "extracts",
-            "exintro": True,
-            "explaintext": True,
-            "titles": title
-        }
+        # Build structured result from Tavily response
+        result_parts = []
         
-        resp = requests.get(search_url, params=summary_params, headers=headers, timeout=5)
-        data = resp.json()
+        # Include the AI-generated answer if available
+        if response.get("answer"):
+            result_parts.append(f"**Summary:** {response['answer']}")
         
-        pages = data["query"]["pages"]
-        page_id = next(iter(pages))
-        extract = pages[page_id].get("extract")
+        # Include relevant search results
+        results = response.get("results", [])
+        if results:
+            result_parts.append("\n**Sources:**")
+            for i, item in enumerate(results[:3], 1):  # Limit to top 3 sources
+                title = item.get("title", "Untitled")
+                url = item.get("url", "")
+                content = item.get("content", "")
+                raw_content = item.get("raw_content", "")
+                
+                # Use raw_content if available, otherwise fallback to content
+                source_text = raw_content[:1500] if raw_content else content[:1000]
+                
+                result_parts.append(f"\n{i}. **{title}**")
+                if url:
+                    result_parts.append(f"   URL: {url}")
+                if source_text:
+                    result_parts.append(f"   {source_text}")
         
-        if extract:
-            # Filter extremely short or disambiguation pages
-            if "refer to:" in extract and len(extract) < 200:
-                return None
-            return f"Wikipedia Source ({title}):\n{extract[:2500]}"
-            
+        if result_parts:
+            return "\n".join(result_parts)
+        
     except Exception as e:
-        print(f"Wikipedia Search Error: {e}")
+        print(f"Tavily search error: {e}")
     
     return None
 
 def perform_web_search(query):
     """
-    Perform Knowledge Search via Wikipedia API.
-    (DuckDuckGo removed to minimize CPU usage/latency).
+    Perform web search using Tavily API.
+    Returns search results or None if unavailable.
     """
-    # Simply return the Wikipedia result. 
-    # If None, we return None (no external context).
-    return perform_wikipedia_search(query)
+    return perform_tavily_search(query)
 
 # ---------------------
 # Chat endpoint
@@ -680,12 +1031,12 @@ def chat():
             user_message = request.form.get('message', '')
             session_id = request.form.get('session_id', 'default')
             selected_model = request.form.get('model', selected_model)
+            mode = request.form.get('mode', 'default')
             
             # File Handling (Stage 1)
             if 'file' in request.files:
                 file = request.files['file']
                 if file and file.filename:
-                    print(f"File attached: {file.filename} - Activating Stage 1 Multimodal Analysis")
                     if is_unsupported_binary(file.filename):
                         return jsonify({
                             'error': "File type not supported.\nSupported files: Images (.png, .jpg, .webp) and Plain Text (.txt, .md, .json, .csv)."
@@ -696,22 +1047,17 @@ def chat():
                         # Invoke Stage 1
                         file_analysis_context = stage_1_analyze(file, file_type)
                         if file_analysis_context.startswith("Error") or file_analysis_context.startswith("Analysis failed"):
-                             print(f"Stage 1 Failed: {file_analysis_context}")
                              return jsonify({'error': f"File Processing Failed: {file_analysis_context}"}), 500
                     else:
                          return jsonify({
                             'error': "File type not supported.\nSupported files: Images (.png, .jpg, .webp) and Plain Text (.txt, .md, .json, .csv)."
                         }), 400
-                else:
-                    print("Multipart request with no file - Bypassing Stage 1")
-            else:
-                print("Multipart request without 'file' key - Bypassing Stage 1")
         else:
-            print("JSON request (Text Only) - Bypassing Stage 1")
             data = request.get_json() or {}
             user_message = data.get('message', '')
             session_id = data.get('session_id', 'default')
             selected_model = data.get('model', selected_model)
+            mode = data.get('mode', 'default')
 
 
         # Validate session ID
@@ -736,11 +1082,8 @@ def chat():
             }), 400
 
         # WEB SEARCH LOGIC (Auto-Classify)
-        # WEB SEARCH LOGIC (Auto-Classify)
-        if user_message and len(user_message) > 5:
-             print(f"DEBUG: Checking if web search is needed for: {user_message[:50]}...")
+        if user_message and len(user_message) > 5 and mode != 'study':
              if classify_query(user_message):
-                 print("DEBUG: Web Search REQUIRED.")
                  search_results = perform_web_search(user_message)
                  
                  if search_results:
@@ -751,10 +1094,15 @@ def chat():
                      # Failure: Inject Limit Prompt
                      # This forces the AI to admit failure gracefully.
                      web_search_context = f"{WEB_MODE_LIMIT_SYSTEM_PROMPT}\n"
-             else:
-                 print("DEBUG: Web Search NOT Required.")
 
         memory_manager = get_memory_manager(session_id)
+        
+        # Apply Mode (Study vs Default)
+        if mode == 'study':
+            memory_manager.set_study_mode(True)
+        else:
+            memory_manager.set_study_mode(False) # Ensure we revert to default if not study
+            
         memory_manager.set_model(selected_model)
         
         # Add context (File Analysis + Web Search)
@@ -769,6 +1117,10 @@ def chat():
                  final_user_content += f"{web_search_context}\n\n"
             
             final_user_content += f"User question:\n{user_message}"
+
+        # Force enforcement of Study Mode Protocol in the immediate context
+        if mode == 'study':
+             final_user_content += "\n\n[SYSTEM MANDATE: You are in Study Mode (Professor Nexus). STRICTLY follow the 'Professional Tutor' protocol (No 'Step' labels). Use STRUCTURED FORMATTING (Headers, Bullets). If the user is confused, switch to ANALOGIES/STORIES immediately. You MUST end with a distinct 'Knowledge Check' section.]"
         
         memory_manager.add_message('user', final_user_content)
         conversation_messages = memory_manager.get_conversation_buffer()
@@ -777,8 +1129,6 @@ def chat():
         # STAGE-2: REASONER (Provider-based routing)
         # ============================================
         provider = model_info["provider"]
-        
-        print(f"DEBUG: Routing to provider: {provider} for model: {selected_model}")
         
         if provider == "openrouter":
             headers = {
@@ -792,14 +1142,12 @@ def chat():
                 "messages": conversation_messages,
                 "max_tokens": 4096
             }
-            print(f"DEBUG: Calling OpenRouter API...")
             response = requests.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers=headers,
                 json=payload,
                 timeout=60
             )
-            print(f"DEBUG: OpenRouter response status: {response.status_code}")
         
         elif provider == "nim":
             headers = {
@@ -811,20 +1159,15 @@ def chat():
                 "messages": conversation_messages,
                 "max_tokens": 4096
             }
-            print(f"DEBUG: Calling NVIDIA NIM API...")
             response = requests.post(
                 "https://integrate.api.nvidia.com/v1/chat/completions",
                 headers=headers,
                 json=payload,
                 timeout=60
             )
-            print(f"DEBUG: NVIDIA NIM response status: {response.status_code}")
         
         else:
-            print(f"DEBUG: Invalid provider: {provider}")
             return jsonify({"error": "Invalid model provider"}), 500
-
-        print(f"DEBUG: About to check response status...")
         if response.status_code == 200:
             api_response = response.json()
             bot_message = api_response['choices'][0]['message']['content'] or "Empty response"
@@ -834,12 +1177,6 @@ def chat():
             cleanup_old_sessions(max_sessions=500)
             return jsonify({'response': bot_message, 'model': selected_model, 'conversation_stats': memory_manager.get_conversation_stats()})
         else:
-            # Log the actual error response for debugging
-            try:
-                error_response = response.json()
-                print(f"DEBUG: API Error Response: {json.dumps(error_response, indent=2)}")
-            except:
-                print(f"DEBUG: API Error Response (raw): {response.text[:500]}")
             
             # Don't expose internal API details in error messages
             if response.status_code == 401:
@@ -855,18 +1192,22 @@ def chat():
             return jsonify({'error': error_msg}), 500
 
     except Exception as e:
-        print(f"CHAT ENDPOINT ERROR: {type(e).__name__}: {str(e)}")
-        import traceback
-        traceback.print_exc()
         try:
             log_session_details(session_id, user_message, selected_model, conversation_messages, error=str(e))
         except:
             pass  # If logging fails, don't crash
-        return jsonify({'error': str(e)}), 500
+        # Don't expose internal error details to the client
+        return jsonify({'error': 'An unexpected error occurred. Please try again.'}), 500
 
-# DEV_MODE_START: Added missing endpoints for conversation management
+# ---------------------
+# Conversation Management Endpoints
+# ---------------------
 @app.route('/api/conversation/stats', methods=['GET'])
 def conversation_stats():
+    # Security: Validate origin
+    if not validate_request_origin():
+        return jsonify({'error': 'Request origin not allowed'}), 403
+    
     session_id = request.args.get('session_id')
     if not session_id:
         return jsonify({'error': 'Session ID required'}), 400
@@ -882,6 +1223,14 @@ def classify_endpoint():
     """
     Expose classification logic to frontend for UI feedback.
     """
+    # Security: Validate origin and apply rate limiting
+    if not validate_request_origin():
+        return jsonify({'error': 'Request origin not allowed'}), 403
+    
+    client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+    if not check_rate_limit(client_ip, max_requests=30, window_seconds=60):  # More lenient for classification
+        return jsonify({'error': 'Rate limit exceeded'}), 429
+    
     try:
         data = request.get_json()
         query = data.get('message', '')
@@ -890,12 +1239,19 @@ def classify_endpoint():
             
         is_required = classify_query(query)
         return jsonify({'web_required': is_required})
-    except Exception as e:
-        print(f"Classification Endpoint Error: {e}")
-        return jsonify({'web_required': False}) # Default to false on error
+    except Exception:
+        return jsonify({'web_required': False})
 
 @app.route('/api/conversation/clear', methods=['POST'])
 def clear_conversation():
+    # Security: Validate origin and apply rate limiting
+    if not validate_request_origin():
+        return jsonify({'error': 'Request origin not allowed'}), 403
+    
+    client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+    if not check_rate_limit(client_ip, max_requests=5, window_seconds=60):  # Strict for destructive action
+        return jsonify({'error': 'Rate limit exceeded'}), 429
+    
     data = request.get_json()
     session_id = data.get('session_id')
     
@@ -912,7 +1268,6 @@ def clear_conversation():
         'status': 'cleared',
         'stats': memory_manager.get_conversation_stats()
     })
-# DEV_MODE_END
 
 # ---------------------
 # Health endpoint

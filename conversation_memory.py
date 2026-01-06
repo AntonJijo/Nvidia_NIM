@@ -19,10 +19,9 @@ try:
     import tiktoken
 except ImportError:
     tiktoken = None
-    print("Warning: TikToken not available, using fallback tokenization")
 
 # Import strict global persona + formatting enforcement
-from system_prompts import get_master_system_prompt, enforce_formatting
+from system_prompts import get_master_system_prompt, enforce_formatting, STUDY_MODE_SYSTEM_PROMPT
 
 
 @dataclass
@@ -54,12 +53,9 @@ class TokenCounter:
             try:
                 # Use GPT-4 tokenizer as it's most representative of modern LLMs
                 self.tokenizer = tiktoken.get_encoding("cl100k_base")  # GPT-4/ChatGPT tokenizer
-                print("Info: Using TikToken (GPT-4 tokenizer) for accurate token counting")
-            except Exception as e:
-                print(f"Warning: Could not initialize TikToken: {e}")
+            except Exception:
                 self.tokenizer = None
-        else:
-            print("Info: TikToken not available, using improved fallback")
+        
 
     def count_tokens(self, text: str, model: Optional[str] = None) -> int:
         if not text:
@@ -70,8 +66,8 @@ class TokenCounter:
                 # Use TikToken for precise counting
                 tokens = self.tokenizer.encode(text)
                 return len(tokens)
-            except Exception as e:
-                print(f"TikToken error: {e}")
+            except Exception:
+                pass
                 
         # Fallback estimation if TikToken fails
         words = text.split()
@@ -161,8 +157,12 @@ class ConversationMemoryManager:
         # Add pinned global system rules
         self._add_system_prompt()
 
-    def _add_system_prompt(self):
-        system_content = get_master_system_prompt()
+    def _add_system_prompt(self, is_study_mode: bool = False):
+        if is_study_mode:
+            system_content = STUDY_MODE_SYSTEM_PROMPT
+        else:
+            system_content = get_master_system_prompt()
+            
         system_msg = ConversationMessage(
             role="system",
             content=system_content,
@@ -171,6 +171,16 @@ class ConversationMemoryManager:
             is_pinned=True,
         )
         self.messages.append(system_msg)
+
+    def set_study_mode(self, enabled: bool = True):
+        """Switches the system prompt to Study Mode or reverts to default."""
+        # Remove existing system prompt
+        self.messages = [m for m in self.messages if m.role != "system" or not m.is_pinned]
+        # Add new prompt
+        self._add_system_prompt(is_study_mode=enabled)
+        # Ensure system prompt is first
+        sys_msg = self.messages.pop(-1) # _add_system_prompt appends to end
+        self.messages.insert(0, sys_msg)
 
     def set_model(self, model_name: str):
         self.current_model = model_name
@@ -183,9 +193,7 @@ class ConversationMemoryManager:
         return self.MODEL_CONFIGS.get(self.current_model, ModelConfig("Default", 32_000))
 
     def add_message(self, role: str, content: str, is_pinned: bool = False) -> ConversationMessage:
-        # Handle None content gracefully
         if content is None:
-            print(f"WARNING: Received None content for {role} message, using empty string")
             content = ""
         
         # Strictly enforce formatting only for assistant outputs
@@ -193,9 +201,6 @@ class ConversationMemoryManager:
             content = enforce_formatting(content, self.format)
 
         token_count = self.token_counter.count_tokens(content, self.current_model)
-        content_length = len(content) if content else 0
-        print(f"DEBUG: Adding {role} message with {content_length} chars, estimated {token_count} tokens")
-        print(f"DEBUG: Content preview: {content[:100] if content else 'EMPTY'}...")
         
         msg = ConversationMessage(
             role=role,
@@ -205,9 +210,6 @@ class ConversationMemoryManager:
             is_pinned=is_pinned,
         )
         self.messages.append(msg)
-        
-        total_before = self._calculate_total_tokens() - token_count
-        print(f"DEBUG: Total tokens before: {total_before}, after: {self._calculate_total_tokens()}")
         
         self._manage_buffer_size()
         return msg
@@ -329,25 +331,13 @@ _memory_managers: Dict[str, ConversationMemoryManager] = {}
 
 
 def get_memory_manager(session_id: str = "default", fmt: str = "markdown") -> ConversationMemoryManager:
-    print(f"DEBUG: Getting memory manager for session {session_id}")
-    print(f"DEBUG: Current sessions in memory: {list(_memory_managers.keys())}")
-    
     if session_id not in _memory_managers:
-        print(f"DEBUG: Creating new memory manager for session {session_id}")
         _memory_managers[session_id] = ConversationMemoryManager(session_id, fmt=fmt)
-    else:
-        print(f"DEBUG: Using existing memory manager for session {session_id}")
-        print(f"DEBUG: Existing session has {len(_memory_managers[session_id].messages)} messages")
-    
     return _memory_managers[session_id]
 
 
 def cleanup_old_sessions(max_sessions: int = 100):
-    print(f"DEBUG: Cleanup called - current sessions: {len(_memory_managers)}, max: {max_sessions}")
     if len(_memory_managers) > max_sessions:
         oldest = sorted(_memory_managers.keys())[: len(_memory_managers) - max_sessions]
-        print(f"DEBUG: Removing old sessions: {oldest}")
         for sid in oldest:
             del _memory_managers[sid]
-    else:
-        print(f"DEBUG: No cleanup needed - {len(_memory_managers)} sessions below limit")

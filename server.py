@@ -78,11 +78,7 @@ tavily_client = TavilyClient(TAVILY_API_KEY) if TAVILY_API_KEY else None
 # MODEL REGISTRY (CORE ROUTING LOGIC)
 # ============================================
 MODEL_REGISTRY = {
-    # ---------- NVIDIA NIM (DEEPSEEK + NVIDIA MODELS) ----------
-    "nvidia/llama-3.1-nemotron-nano-vl-8b-v1": {
-        "provider": "nim",
-        "capabilities": ["vision", "text"]
-    },
+    # ---------- NVIDIA NIM (Primary Models) ----------
     "meta/llama-4-maverick-17b-128e-instruct": {
         "provider": "nim",
         "capabilities": ["text"]
@@ -116,7 +112,7 @@ MODEL_REGISTRY = {
         "capabilities": ["text"]
     },
     
-    # ---------- OpenRouter (FREE MODELS ONLY) ----------
+    # ---------- OpenRouter (FREE MODELS) ----------
     "qwen/qwen3-235b-a22b:free": {
         "provider": "openrouter",
         "capabilities": ["text"]
@@ -125,11 +121,8 @@ MODEL_REGISTRY = {
         "provider": "openrouter",
         "capabilities": ["text"]
     },
-    "qwen/qwen-2.5-vl-7b-instruct:free": {
-        "provider": "openrouter",
-        "capabilities": ["vision", "text"]
-    },
-    # Stage-1 Vision Model (for internal use only)
+    
+    # ---------- Internal Vision Model (for Stage-1 image analysis) ----------
     "nvidia/nemotron-nano-12b-v2-vl:free": {
         "provider": "openrouter",
         "capabilities": ["vision", "text"]
@@ -571,12 +564,16 @@ You MUST NOT use WEB MODE when:
   - Policies
   - Heuristics
   - Design patterns
+  - Well-known website URLs (google.com, facebook.com, youtube.com, etc.)
+  - Official homepages of major companies (their URLs are static and well-known)
 
 - The answer can be derived purely from reasoning.
 
 - The user does NOT explicitly or implicitly request up-to-date facts.
 
 - The answer is generic and timeless.
+
+- The user asks for a link to a WELL-KNOWN website (e.g., "give me link to google" → just say https://www.google.com/, NO web search needed)
 
 ----------------------------------------------------------------
 SECTION 4 — STRONG MUST USE WEB MODE CONDITIONS
@@ -705,6 +702,18 @@ User: "Write a system prompt"
 
 User: "What is the current API limit?"
 → WEB_REQUIRED
+
+User: "Give me the link to google.com"
+→ WEB_NOT_REQUIRED (google.com is a well-known, static URL)
+
+User: "What is the Facebook website?"
+→ WEB_NOT_REQUIRED (facebook.com is universally known)
+
+User: "Link to YouTube"
+→ WEB_NOT_REQUIRED (youtube.com is common knowledge)
+
+User: "How do I contact OpenAI?"
+→ WEB_REQUIRED (contact info may change)
 
 ----------------------------------------------------------------
 SECTION 11 — STRICT PROHIBITIONS
@@ -858,6 +867,53 @@ Respond like you're having a helpful conversation — NOT like
 you're reading from a search results page.
 
 Be accurate. Be natural. Be helpful.
+
+------------------------------------------------------------
+SECTION 7 — CONTENT SAFETY EVALUATION FOR UNKNOWN LINKS
+------------------------------------------------------------
+
+When the user asks about an UNKNOWN website/domain/link and web search 
+results are provided, you MUST evaluate them for safety:
+
+EVALUATION PROCESS:
+1. Analyze the web search results to understand what the site is
+2. Look for indicators of harmful content:
+   - Adult/pornographic content
+   - Piracy/illegal downloads
+   - Malware/phishing/scam warnings
+   - Violence/gore content
+   - Hate speech/extremism
+   - Illegal drug sales
+   - Gambling (unregulated)
+   - Dark web services
+
+3. If search results indicate the site is HARMFUL:
+   - Do NOT provide details about how to access it
+   - Do NOT describe the harmful content in detail
+   - Briefly state: "Based on what I found, that site contains [category] content, which I can't help with."
+   - Offer to help with legitimate alternatives
+
+4. If search results indicate the site is SAFE/LEGITIMATE:
+   - Provide helpful information about the site
+   - Answer the user's question normally
+
+5. If search results are UNCLEAR about safety:
+   - Exercise caution and err on the side of safety
+   - You may describe the site neutrally without endorsing it
+   - Warn the user to verify the site themselves if unsure
+
+EXAMPLES:
+
+User: "What is xyz-torrent-site.com?"
+Search results show: piracy, illegal downloads, copyright infringement
+→ Response: "That appears to be a piracy site for illegal downloads. I can't help with that, but if you're looking for movies or shows, I'd recommend legitimate streaming services like Netflix, Amazon Prime, or Disney+."
+
+User: "What is notion.so?"
+Search results show: productivity tool, note-taking, legitimate company
+→ Response: "Notion is a popular productivity and note-taking app! It's great for organizing notes, projects, and collaborating with teams. Would you like to know more about its features?"
+
+This safety evaluation applies EVEN IF the site is new or unknown to you - 
+use the web search results to make an informed decision about its safety.
 """
 
 WEB_MODE_LIMIT_SYSTEM_PROMPT = """

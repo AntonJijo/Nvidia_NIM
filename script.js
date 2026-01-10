@@ -1,4 +1,22 @@
-﻿class Chatbot {
+﻿// ============================================
+// DEV MODE CONFIGURATION
+// Set to true to force all API calls to localhost:8000
+// Set to false for production (auto-detects based on hostname)
+// ============================================
+const DEV_MODE = true;
+const DEV_SERVER_URL = 'http://localhost:8000';
+
+// Helper function to get server URLs based on dev mode
+function getServerUrls() {
+    if (DEV_MODE) {
+        return [DEV_SERVER_URL];
+    }
+    return (window.location.hostname === 'antonjijo.github.io' || window.location.hostname === 'nvidia-nim.pages.dev')
+        ? ['https://nvidia-nim-bot.onrender.com', 'https://Nvidia.pythonanywhere.com']
+        : ['http://localhost:8000'];
+}
+
+class Chatbot {
     // Escape HTML meta-characters from a string
     escapeHTML(str) {
         if (typeof str !== 'string') return '';
@@ -76,6 +94,45 @@
             `;
         };
 
+        // Custom link renderer for ChatGPT-style secure links
+        // Note: Content blocking is handled by AI via system prompt, not frontend
+        renderer.link = (href, title, text) => {
+            // Handle Marked newer versions where first arg is a token object
+            let url = href;
+            let linkText = text;
+            let linkTitle = title;
+
+            if (typeof href === 'object' && href !== null && href.href) {
+                url = href.href;
+                linkText = href.text || href.href;
+                linkTitle = href.title;
+            }
+
+            // Sanitize the URL
+            const safeUrl = this.escapeHTML(url || '');
+            const safeText = linkText || safeUrl;
+            const safeTitleAttr = linkTitle ? ` title="${this.escapeHTML(linkTitle)}"` : '';
+
+            // Check if it's an external link (various protocols)
+            const externalProtocols = ['http://', 'https://', 'ftp://', 'ftps://', 'sftp://'];
+            const isExternal = externalProtocols.some(protocol => safeUrl.toLowerCase().startsWith(protocol));
+
+            // Special protocols that open apps (mailto, tel, etc.)
+            const appProtocols = ['mailto:', 'tel:', 'sms:', 'whatsapp:', 'skype:'];
+            const isAppLink = appProtocols.some(protocol => safeUrl.toLowerCase().startsWith(protocol));
+
+            if (isExternal) {
+                // External web link with security icon and click interception
+                return `<a href="${safeUrl}" class="secure-link" data-external="true"${safeTitleAttr}>${safeText}<svg class="external-link-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`;
+            } else if (isAppLink) {
+                // App protocol links (mailto, tel, etc.) - show with different icon
+                return `<a href="${safeUrl}" class="app-link"${safeTitleAttr}>${safeText}<svg class="app-link-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></a>`;
+            } else {
+                // Internal/relative link (rare in chat context)
+                return `<a href="${safeUrl}"${safeTitleAttr}>${safeText}</a>`;
+            }
+        };
+
         marked.setOptions({
             renderer: renderer,
             breaks: true,
@@ -92,8 +149,8 @@
         // Sanitize HTML
         if (typeof DOMPurify !== 'undefined') {
             html = DOMPurify.sanitize(html, {
-                ADD_TAGS: ['div', 'span', 'i', 'button'],
-                ADD_ATTR: ['target', 'class', 'id', 'data-code-id', 'title']
+                ADD_TAGS: ['div', 'span', 'i', 'button', 'svg', 'path', 'polyline', 'line'],
+                ADD_ATTR: ['target', 'class', 'id', 'data-code-id', 'data-external', 'title', 'viewBox', 'fill', 'stroke', 'stroke-width', 'd', 'points', 'x1', 'y1', 'x2', 'y2']
             });
         }
 
@@ -117,6 +174,7 @@
         this.autoResizeTextarea();
         this.initServerHealthCheck();
         this.setupSessionControls();
+        this.setupSecureLinkHandler(); // ChatGPT-style link confirmation
 
         // Load initial conversation stats
         this.loadInitialStats();
@@ -207,9 +265,7 @@
 
     async getConversationStats() {
         try {
-            const servers = (window.location.hostname === 'antonjijo.github.io' || window.location.hostname === 'nvidia-nim.pages.dev')
-                ? ['https://nvidia-nim-bot.onrender.com', 'https://Nvidia.pythonanywhere.com']
-                : ['http://localhost:8000'];
+            const servers = getServerUrls();
 
             for (const serverURL of servers) {
                 try {
@@ -239,9 +295,7 @@
 
     async clearConversation() {
         try {
-            const servers = (window.location.hostname === 'antonjijo.github.io' || window.location.hostname === 'nvidia-nim.pages.dev')
-                ? ['https://nvidia-nim-bot.onrender.com', 'https://Nvidia.pythonanywhere.com']
-                : ['http://localhost:8000'];
+            const servers = getServerUrls();
 
             for (const serverURL of servers) {
                 try {
@@ -1487,9 +1541,7 @@
             if (message && message.length > 5) {
                 (async () => {
                     try {
-                        const servers = (window.location.hostname === 'antonjijo.github.io' || window.location.hostname === 'nvidia-nim.pages.dev')
-                            ? ['https://nvidia-nim-bot.onrender.com', 'https://Nvidia.pythonanywhere.com']
-                            : ['http://localhost:8000'];
+                        const servers = getServerUrls();
                         const serverURL = servers[0];
 
                         const checkResp = await fetch(`${serverURL}/api/classify`, {
@@ -1607,9 +1659,7 @@
         const selectedModel = this.modelSelect.value;
 
         // Define server URLs for Production/Dev
-        const servers = (window.location.hostname === 'antonjijo.github.io' || window.location.hostname === 'nvidia-nim.pages.dev')
-            ? ['https://nvidia-nim-bot.onrender.com', 'https://Nvidia.pythonanywhere.com']
-            : ['http://localhost:8000'];
+        const servers = getServerUrls();
 
         let lastError = null;
         let finalMessage = message;
@@ -1725,7 +1775,7 @@
         };
     }
 
-    addMessage(content, sender, save = true) {
+    addMessage(content, sender, save = true, loadedIndex = null) {
         // Store message in memory
         if (save) {
             this.messages.push({ role: sender, content: content });
@@ -1740,12 +1790,16 @@
         messageDiv.className = `message ${sender}-message`;
 
         if (sender === 'user') {
-            // User message - simple pill bubble
+            // User message - bubble with actions below (ChatGPT style)
+            // Track message index for editing (use loadedIndex for restored chats, or compute for new)
+            const msgIndex = loadedIndex !== null ? loadedIndex : (save ? this.messages.length - 1 : -1);
+            messageDiv.dataset.msgIndex = msgIndex;
+
             const bubble = document.createElement('div');
             bubble.className = 'message-bubble';
             bubble.textContent = content;
 
-            // Action buttons (Copy only)
+            // Action buttons below message (Copy and Edit)
             const actions = document.createElement('div');
             actions.className = 'message-actions user-actions';
             actions.innerHTML = `
@@ -1755,12 +1809,18 @@
                         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                     </svg>
                 </button>
+                <button class="action-btn edit-action" title="Edit">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                </button>
             `;
 
-            messageDiv.appendChild(actions);
             messageDiv.appendChild(bubble);
+            messageDiv.appendChild(actions);
 
-            this.attachActionListeners(actions, content);
+            this.attachUserActionListeners(actions, content, messageDiv, msgIndex);
         } else {
             // Bot message - plain text with actions
             const inner = document.createElement('div');
@@ -1908,10 +1968,181 @@
         }
     }
 
+    // Handle user message actions (Copy + Edit)
+    attachUserActionListeners(actionsEl, content, messageDiv, msgIndex) {
+        // Copy button
+        const copyBtn = actionsEl.querySelector('.copy-action');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', () => {
+                navigator.clipboard.writeText(content).then(() => {
+                    copyBtn.classList.add('copied');
+                    setTimeout(() => copyBtn.classList.remove('copied'), 2000);
+                });
+            });
+        }
+
+        // Edit button
+        const editBtn = actionsEl.querySelector('.edit-action');
+        if (editBtn) {
+            editBtn.addEventListener('click', () => {
+                this.enableMessageEdit(messageDiv, content, msgIndex);
+            });
+        }
+    }
+
+    // Enable inline editing of user message (ChatGPT style)
+    enableMessageEdit(messageDiv, originalContent, msgIndex) {
+        // Store original structure
+        const originalHTML = messageDiv.innerHTML;
+        const bubble = messageDiv.querySelector('.message-bubble');
+        const actions = messageDiv.querySelector('.message-actions');
+
+        if (!bubble) return;
+
+        // Hide original content
+        bubble.style.display = 'none';
+        if (actions) actions.style.display = 'none';
+
+        // Create edit container
+        const editContainer = document.createElement('div');
+        editContainer.className = 'message-edit-container';
+        editContainer.innerHTML = `
+            <textarea class="message-edit-textarea">${this.escapeHTML(originalContent)}</textarea>
+            <div class="message-edit-actions">
+                <button class="edit-cancel-btn">Cancel</button>
+                <button class="edit-send-btn">Send</button>
+            </div>
+        `;
+
+        messageDiv.appendChild(editContainer);
+
+        const textarea = editContainer.querySelector('.message-edit-textarea');
+        const cancelBtn = editContainer.querySelector('.edit-cancel-btn');
+        const sendBtn = editContainer.querySelector('.edit-send-btn');
+
+        // Focus and select all text
+        textarea.focus();
+        textarea.select();
+
+        // Auto-resize textarea
+        const autoResize = () => {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 300) + 'px';
+        };
+        autoResize();
+        textarea.addEventListener('input', autoResize);
+
+        // Cancel button
+        cancelBtn.addEventListener('click', () => {
+            editContainer.remove();
+            bubble.style.display = '';
+            if (actions) actions.style.display = '';
+        });
+
+        // Send button
+        sendBtn.addEventListener('click', () => {
+            const newContent = textarea.value.trim();
+            if (newContent && newContent !== originalContent) {
+                this.submitEditedMessage(messageDiv, newContent, msgIndex);
+            } else {
+                // No change or empty - just cancel
+                editContainer.remove();
+                bubble.style.display = '';
+                if (actions) actions.style.display = '';
+            }
+        });
+
+        // Handle keyboard shortcuts
+        textarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                cancelBtn.click();
+            } else if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendBtn.click();
+            }
+        });
+    }
+
+    // Submit edited message and regenerate response
+    async submitEditedMessage(messageDiv, newContent, msgIndex) {
+        if (msgIndex < 0 || this.isLoading) return;
+
+        // Remove edit container and update bubble
+        const editContainer = messageDiv.querySelector('.message-edit-container');
+        if (editContainer) editContainer.remove();
+
+        const bubble = messageDiv.querySelector('.message-bubble');
+        const actions = messageDiv.querySelector('.message-actions');
+
+        if (bubble) {
+            bubble.textContent = newContent;
+            bubble.style.display = '';
+        }
+        if (actions) actions.style.display = '';
+
+        // Update the message in the messages array
+        this.messages[msgIndex].content = newContent;
+
+        // Remove all messages after this one from the array
+        this.messages = this.messages.slice(0, msgIndex + 1);
+
+        // Remove all DOM elements after this message
+        let sibling = messageDiv.nextElementSibling;
+        while (sibling) {
+            const nextSibling = sibling.nextElementSibling;
+            sibling.remove();
+            sibling = nextSibling;
+        }
+
+        // Save updated conversation
+        if (window.chatSaver) window.chatSaver.saveCurrentChat();
+
+        // Now send the edited message to get a new AI response
+        this.isLoading = true;
+        this.showTypingIndicator();
+
+        // Check for Web Search Requirement (Non-blocking / Parallel)
+        if (newContent && newContent.length > 5) {
+            (async () => {
+                try {
+                    const servers = getServerUrls();
+                    const serverURL = servers[0];
+
+                    const checkResp = await fetch(`${serverURL}/api/classify`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: newContent })
+                    });
+
+                    if (checkResp.ok) {
+                        const checkData = await checkResp.json();
+                        if (checkData.web_required && this.isLoading && document.getElementById('typingIndicator')) {
+                            this.hideTypingIndicator();
+                            this.showAnalyzingIndicator('wiki');
+                        }
+                    }
+                } catch (e) {
+                    // Intent check failed
+                }
+            })();
+        }
+
+        try {
+            const response = await this.callNvidiaAPI(newContent);
+            this.addMessageWithTyping(response, 'bot');
+        } catch (error) {
+            console.error('Chat API Error:', error);
+            this.isLoading = false;
+            this.showErrorMessage(error.message || 'Unknown error occurred');
+        }
+    }
+
     addMessageWithTyping(content, sender, save = true) {
         // Store message in memory
+        // Normalize role: 'bot' -> 'assistant' for storage consistency with API
+        const storageRole = (sender === 'bot') ? 'assistant' : sender;
         if (save) {
-            this.messages.push({ role: sender, content: content });
+            this.messages.push({ role: storageRole, content: content });
             // Save to local storage if enabled
             if (window.chatSaver) window.chatSaver.saveCurrentChat();
         }
@@ -1962,12 +2193,8 @@
         }
 
         this.scrollToBottom();
-        this.messages.push({ role: 'assistant', content });
-
-        // Save chat after displaying message
-        if (window.chatSaver) {
-            window.chatSaver.saveCurrentChat();
-        }
+        // NOTE: Message saving is handled by the caller (addMessageWithTyping)
+        // Do NOT push to this.messages here to avoid duplicates
     }
 
     addMessageActions(inner, content) {
@@ -2029,7 +2256,7 @@
                 clearInterval(this.currentTypingInterval);
                 this.currentTypingInterval = null;
                 this.isLoading = false; // Reset loading state when typing completes
-                this.messages.push({ role: 'assistant', content });
+                // NOTE: Message saving is handled by addMessageWithTyping caller
                 this.hideTypingIndicator();
 
                 // Add action buttons after typing is complete
@@ -2070,7 +2297,7 @@
         if (contentContainers.length === 0) {
             this.attachCopyListeners(messageContent);
             this.hideTypingIndicator();
-            this.messages.push({ role: 'assistant', content });
+            // NOTE: Message saving is handled by addMessageWithTyping caller
             // Save chat after bot response
             if (window.chatSaver) {
                 window.chatSaver.saveCurrentChat();
@@ -2095,7 +2322,7 @@
                 this.attachCopyListeners(messageContent);
                 this.scrollToBottom();
                 this.hideTypingIndicator();
-                this.messages.push({ role: 'assistant', content: originalContent });
+                // NOTE: Message saving is handled by addMessageWithTyping caller
                 // Save chat after bot response
                 if (window.chatSaver) {
                     window.chatSaver.saveCurrentChat();
@@ -2180,7 +2407,7 @@
                 this.scrollToBottom();
 
                 this.hideTypingIndicator();
-                this.messages.push({ role: 'assistant', content });
+                // NOTE: Message saving is handled by addMessageWithTyping caller
             }
         }, 3);
     }
@@ -2356,16 +2583,22 @@
     }
 
     animateTokenDisplay(element, start, end) {
-        const duration = 1000;
+        // Longer duration for smoother "counting up" feel
+        const duration = 1500;
         const startTime = performance.now();
         const range = end - start;
+
+        // Add counting class to parent for glow effect
+        if (element.parentElement) {
+            element.parentElement.classList.add('counting');
+        }
 
         const update = (currentTime) => {
             const elapsed = currentTime - startTime;
             const progress = Math.min(elapsed / duration, 1);
 
-            // Ease out expo
-            const ease = 1 - Math.pow(2, -10 * progress);
+            // Ease out cubic for smooth "landing"
+            const ease = 1 - Math.pow(1 - progress, 3);
 
             const currentVal = Math.floor(start + (range * ease));
 
@@ -2377,6 +2610,11 @@
             } else {
                 const finalVal = end > 999 ? `${(end / 1000).toFixed(1)}K` : end;
                 element.textContent = finalVal;
+
+                // Remove counting class
+                if (element.parentElement) {
+                    element.parentElement.classList.remove('counting');
+                }
             }
         };
 
@@ -2393,7 +2631,7 @@
 
         // Update header context info
         if (this.contextInfo && this.contextValue) {
-            this.contextInfo.style.display = 'flex';
+            this.contextInfo.style.display = 'inline-flex'; // Updated to inline-flex
 
             const startTokens = this.currentStatsTokens || 0;
             const endTokens = displayed_tokens || 0;
@@ -2406,10 +2644,13 @@
                 this.contextValue.textContent = contextDisplay;
             }
 
-            // Optional: Color code based on utilization
-            if (utilization_percent > 80) this.contextValue.style.color = '#ef4444';
-            else if (utilization_percent > 60) this.contextValue.style.color = '#f59e0b';
-            else this.contextValue.style.color = ''; // remove inline style to use CSS default
+            // Use CSS classes for color states instead of inline styles
+            this.contextValue.classList.remove('warning', 'danger');
+            if (utilization_percent > 80) {
+                this.contextValue.classList.add('danger');
+            } else if (utilization_percent > 60) {
+                this.contextValue.classList.add('warning');
+            }
         }
 
         if (!current_model) {
@@ -2697,12 +2938,7 @@
 
         try {
             // Define server URLs with primary and failover
-            const servers = (window.location.hostname === 'antonjijo.github.io' || window.location.hostname === 'nvidia-nim.pages.dev')
-                ? [
-                    'https://nvidia-nim-bot.onrender.com',  // Primary server (Render)
-                    'https://Nvidia.pythonanywhere.com'     // Failover server (PythonAnywhere)
-                ]
-                : ['http://localhost:8000'];
+            const servers = getServerUrls();
 
             let connected = false;
             let currentServerName = '';
@@ -3186,6 +3422,101 @@
         this.selectedFile = null;
         if (this.fileInput) this.fileInput.value = '';
         if (this.filePreviewArea) this.filePreviewArea.innerHTML = '';
+    }
+
+    // ============================================
+    // SECURE LINK CONFIRMATION (ChatGPT Style)
+    // ============================================
+
+    setupSecureLinkHandler() {
+        // Use event delegation on chat messages container
+        if (this.chatMessages) {
+            this.chatMessages.addEventListener('click', (e) => {
+                const link = e.target.closest('.secure-link');
+                if (link && link.dataset.external === 'true') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.showLinkConfirmation(link.href);
+                }
+            });
+        }
+    }
+
+    showLinkConfirmation(url) {
+        // Create modal overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'link-modal-overlay';
+        overlay.innerHTML = `
+            <div class="link-modal">
+                <div class="link-modal-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                        <polyline points="15 3 21 3 21 9"/>
+                        <line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                </div>
+                <h3 class="link-modal-title">You're about to leave this site</h3>
+                <p class="link-modal-text">This link will open in a new tab:</p>
+                <div class="link-modal-url">${this.escapeHTML(url)}</div>
+                <p class="link-modal-warning">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    Be cautious when visiting external websites
+                </p>
+                <div class="link-modal-actions">
+                    <button class="link-modal-cancel">Cancel</button>
+                    <button class="link-modal-open">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                            <polyline points="15 3 21 3 21 9"/>
+                            <line x1="10" y1="14" x2="21" y2="3"/>
+                        </svg>
+                        Open Link
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        // Animate in
+        requestAnimationFrame(() => {
+            overlay.classList.add('active');
+        });
+
+        // Event handlers
+        const cancelBtn = overlay.querySelector('.link-modal-cancel');
+        const openBtn = overlay.querySelector('.link-modal-open');
+
+        const closeModal = () => {
+            overlay.classList.remove('active');
+            setTimeout(() => overlay.remove(), 200);
+        };
+
+        cancelBtn.addEventListener('click', closeModal);
+
+        openBtn.addEventListener('click', () => {
+            // Open in new tab with security attributes
+            window.open(url, '_blank', 'noopener,noreferrer');
+            closeModal();
+        });
+
+        // Close on overlay click
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) closeModal();
+        });
+
+        // Close on Escape
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+                document.removeEventListener('keydown', handleEscape);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
     }
 }
 

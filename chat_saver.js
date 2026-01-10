@@ -186,8 +186,9 @@ class ChatSaver {
         // History disabled - stop showing/saving
     }
 
-    resetConsent() {
-        localStorage.removeItem(this.consentKey);
+    // Called when user clicks "Enable History" in sidebar (after declining)
+    // Does NOT reset consent state - just shows popup to allow opt-in
+    showConsentFromSidebar() {
         this.showConsentPopup();
     }
 
@@ -210,6 +211,10 @@ class ChatSaver {
         if (history.length > 100) history.pop();
 
         localStorage.setItem(this.storageKey, JSON.stringify(history));
+
+        // Reset document title immediately for New Chat
+        this.updateDocumentTitle('NVIDIA NIM');
+
         this.renderSidebar();
     }
 
@@ -278,6 +283,11 @@ class ChatSaver {
 
         history[chatIndex] = chatData;
 
+        // Update document title if this is the active chat
+        if (titleChanged) {
+            this.updateDocumentTitle(newTitle);
+        }
+
         // Trigger AI Generation if needed
         if (!chatData.isTitleGenerated && firstUserMsg && !chatData.isGeneratingTitle) {
             chatData.isGeneratingTitle = true;
@@ -317,8 +327,8 @@ class ChatSaver {
     typeText(element, text) {
         element.textContent = '';
         let i = 0;
-        // Faster typing for clearer effect
-        const speed = 30;
+        // Faster typing for clearer effect - User requested FASTER updates
+        const speed = 10; // Was 30
 
         function type() {
             if (i < text.length) {
@@ -331,12 +341,9 @@ class ChatSaver {
     }
 
     async generateTitle(chatId, firstMessage, model) {
-        // Define server URLs matching script.js logic
-        const servers = window.location.hostname === 'antonjijo.github.io'
-            ? [
-                'https://nvidia-nim-bot.onrender.com',
-                'https://Nvidia.pythonanywhere.com'
-            ]
+        // Use global getServerUrls() if available (from script.js), otherwise fallback
+        const servers = (typeof getServerUrls === 'function')
+            ? getServerUrls()
             : ['http://localhost:8000'];
 
         try {
@@ -387,6 +394,11 @@ class ChatSaver {
 
                     // Use animation for AI title too
                     this.animateTitleUpdate(chatId, title);
+
+                    // Update document title if this is the active chat
+                    if (window.chatbot && window.chatbot.sessionId === chatId) {
+                        this.updateDocumentTitle(title);
+                    }
                 }
             }
         } catch (err) {
@@ -417,12 +429,21 @@ class ChatSaver {
                     </button>
                 </div>
             `;
-            document.getElementById('enable-history-btn')?.addEventListener('click', () => this.resetConsent());
+            document.getElementById('enable-history-btn')?.addEventListener('click', () => this.showConsentFromSidebar());
             return;
         }
 
         if (consent !== 'accepted') {
-            // Pending consent or not set
+            // Pending consent or not set - show helpful message
+            container.innerHTML = `
+                <div style="padding: 16px; text-align: center;">
+                    <p style="color: #6b7280; font-size: 12px; margin-bottom: 12px;">Accept cookies to enable chat history</p>
+                    <button id="show-consent-btn" style="font-size: 12px; padding: 6px 12px; background: rgba(74, 222, 128, 0.1); color: #4ade80; border-radius: 4px; border: 1px solid rgba(74, 222, 128, 0.2); cursor: pointer; width: 100%;" onmouseover="this.style.backgroundColor='rgba(74, 222, 128, 0.2)'" onmouseout="this.style.backgroundColor='rgba(74, 222, 128, 0.1)'">
+                        Enable History
+                    </button>
+                </div>
+            `;
+            document.getElementById('show-consent-btn')?.addEventListener('click', () => this.showConsentPopup());
             return;
         }
 
@@ -523,14 +544,17 @@ class ChatSaver {
             if (chat.messages.length === 0) {
                 window.chatbot.addWelcomeMessage();
             } else {
-                chat.messages.forEach(msg => {
-                    // Use addMessage with save=false to avoid duplication and typing animation
-                    // IMPORTANT: addMessage returns the element but doesn't append it for non-user roles in script.js
-                    const msgEl = window.chatbot.addMessage(msg.content, msg.role, false);
+                chat.messages.forEach((msg, index) => {
+                    // Normalize role: 'assistant' -> 'bot' for CSS styling compatibility
+                    // Messages are stored as 'assistant' but CSS uses 'bot-message' class
+                    const displayRole = (msg.role === 'assistant') ? 'bot' : msg.role;
 
-                    if (msg.role !== 'user' && msgEl) {
+                    // Use addMessage with save=false to avoid duplication and typing animation
+                    // Pass the index for edit functionality on loaded messages
+                    const msgEl = window.chatbot.addMessage(msg.content, displayRole, false, index);
+
+                    if (displayRole !== 'user' && msgEl) {
                         messagesContainer.appendChild(msgEl);
-                        // Ensure copy listeners are attached (addMessage does this internally)
                     }
                 });
                 // Scroll to bottom
@@ -553,6 +577,9 @@ class ChatSaver {
             const overlay = document.getElementById('sidebarOverlay');
             if (sidebar) sidebar.classList.remove('expanded');
             if (overlay) overlay.classList.remove('active');
+
+            // Update document title
+            this.updateDocumentTitle(chat.title);
         }
     }
 
@@ -616,6 +643,9 @@ class ChatSaver {
 
                 const statsEl = document.getElementById('conversationStats');
                 if (statsEl) statsEl.style.display = 'none';
+
+                // Reset document title
+                this.updateDocumentTitle('NVIDIA NIM');
             }
 
             this.renderSidebar();
@@ -635,6 +665,10 @@ class ChatSaver {
             }
         };
         document.addEventListener('keydown', handleEscape);
+    }
+
+    updateDocumentTitle(title) {
+        document.title = title || 'NVIDIA NIM';
     }
 
     escapeHTML(str) {

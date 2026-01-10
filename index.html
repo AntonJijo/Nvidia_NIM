@@ -7,7 +7,7 @@
   <meta name="google-site-verification" content="AUEelyokQcobYiJQp-LK6YBgE-tyo3T-fu_zLHHRhvE" />
   <!-- Content Security Policy for Production -->
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://code.jquery.com https://cdn.datatables.net https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://rsms.me https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.datatables.net https://cdn.jsdelivr.net https://cdn.tailwindcss.com; font-src 'self' https://rsms.me https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; connect-src 'self' https://nvidia-nim-bot.onrender.com https://Nvidia.pythonanywhere.com https://www.google-analytics.com https://cdnjs.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self';">
+    content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://code.jquery.com https://cdn.datatables.net https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://rsms.me https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.datatables.net https://cdn.jsdelivr.net https://cdn.tailwindcss.com; font-src 'self' https://rsms.me https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; connect-src 'self' http://localhost:8000 http://127.0.0.1:8000 https://nvidia-nim-bot.onrender.com https://Nvidia.pythonanywhere.com https://www.google-analytics.com https://cdnjs.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self';">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-5H2HH2MP1L"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -27,6 +27,7 @@
   <link rel="stylesheet" href="style.css?v=30" />
   <link rel="stylesheet" href="animations.css?v=26" />
   <link rel="stylesheet" href="loader.css?v=1" />
+  <link rel="stylesheet" href="performance.css?v=1" />
 </head>
 
 <!-- PERMANENT BACKGROUND LAYERS -->
@@ -126,9 +127,7 @@
         </div>
       </div>
       <div class="conversation-list" id="conversationList">
-        <div class="conversation-item active">
-          <span>New chat</span>
-        </div>
+        <!-- Populated by chat_saver.js -->
       </div>
     </div>
 
@@ -267,10 +266,10 @@
 
       <div class="header-right">
 
-        <!-- Context Usage Info -->
-        <div class="context-info" id="contextInfo" style="display: none;">
-          <i class="fas fa-align-left"></i>
-          <span id="contextValue">0</span> tokens
+        <!-- Token Counter - Sleek & Compact -->
+        <div class="token-display" id="contextInfo" style="display: none;">
+          <img class="token-icon-img" src="https://img.icons8.com/ios-filled/50/chip--v2.png" alt="Token Usage" />
+          <span class="token-value" id="contextValue">0</span>
         </div>
 
         <!-- Status Text -->

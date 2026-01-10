@@ -140,10 +140,11 @@ class ConversationMemoryManager:
         "qwen/qwen2.5-coder-32b-instruct": ModelConfig("Qwen 2.5 Coder", 32_000),
         "qwen/qwen3-coder-480b-a35b-instruct": ModelConfig("Qwen3 Coder 480B", 256_000),
         "deepseek-ai/deepseek-v3.1": ModelConfig("DeepSeek V3.1", 128_000),
+        "deepseek-ai/deepseek-v3.2": ModelConfig("DeepSeek V3.2", 128_000),
         "openai/gpt-oss-120b": ModelConfig("GPT OSS", 128_000),
         "qwen/qwen3-235b-a22b:free": ModelConfig("Qwen3 235B", 131_000),
         "google/gemma-3-27b-it:free": ModelConfig("Gemma 3", 96_000),
-        "x-ai/grok-4-fast:free": ModelConfig("Grok 4", 2_000_000),
+        "moonshotai/kimi-k2-thinking": ModelConfig("Kimi K2 Thinking", 256_000),
     }
 
     def __init__(self, session_id: str = "default", fmt: str = "markdown"):

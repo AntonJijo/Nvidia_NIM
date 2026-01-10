@@ -924,7 +924,8 @@ body {
 
 .user-message {
     display: flex;
-    justify-content: flex-end;
+    flex-direction: column;
+    align-items: flex-end;
     padding: 12px 24px;
 }
 
@@ -944,6 +945,96 @@ body {
     word-wrap: break-word;
     backdrop-filter: blur(5px);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* User message actions - visible on hover, positioned below bubble on RIGHT */
+.user-message .user-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-self: flex-end;
+    gap: 4px;
+    margin-top: 6px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    /* Reset any inherited styles */
+    position: static;
+    width: auto;
+}
+
+.user-message:hover .user-actions {
+    opacity: 1;
+}
+
+/* Message Edit Container (ChatGPT Style) */
+.message-edit-container {
+    width: 100%;
+    max-width: 70%;
+    background: rgba(60, 60, 60, 0.95);
+    border: 1px solid rgba(118, 185, 0, 0.3);
+    border-radius: 16px;
+    padding: 12px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.message-edit-textarea {
+    width: 100%;
+    min-height: 80px;
+    max-height: 300px;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-size: 15px;
+    line-height: 1.6;
+    font-family: inherit;
+    resize: none;
+    padding: 8px;
+}
+
+.message-edit-textarea::placeholder {
+    color: var(--text-muted);
+}
+
+.message-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.edit-cancel-btn,
+.edit-send-btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: none;
+}
+
+.edit-cancel-btn {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.edit-cancel-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.edit-send-btn {
+    background: #76b900;
+    color: #000;
+}
+
+.edit-send-btn:hover {
+    background: #8cd11a;
+    transform: translateY(-1px);
 }
 
 .bot-message {
@@ -2163,7 +2254,8 @@ blockquote {
 .user-actions {
     margin-top: 0 !important;
     margin-right: 8px;
-    align-self: center;
+    align-self: flex-end;
+    padding-top: 8px;
 }
 
 /* Fix mobile alignment */
@@ -3112,4 +3204,362 @@ body::before {
     font-variant: normal !important;
     font-style: normal !important;
     font-weight: 400 !important;
+}
+
+/* ============================================
+   SECURE LINK STYLES (ChatGPT Style)
+   ============================================ */
+
+/* External links with icon */
+.secure-link {
+    color: var(--accent-green);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    margin: 0 2px;
+    background: rgba(74, 222, 128, 0.08);
+    border-radius: 4px;
+    transition: all 0.15s ease;
+    cursor: pointer;
+}
+
+.secure-link:hover {
+    background: rgba(74, 222, 128, 0.15);
+    color: #86efac;
+}
+
+.external-link-icon {
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.secure-link:hover .external-link-icon {
+    opacity: 1;
+}
+
+/* Blocked links (adult, malware, etc.) */
+.blocked-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: #ef4444;
+    text-decoration: line-through;
+    padding: 2px 6px;
+    margin: 0 2px;
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: 4px;
+    cursor: not-allowed;
+    font-size: 0.9em;
+}
+
+.blocked-link svg {
+    flex-shrink: 0;
+}
+
+.blocked-link small {
+    opacity: 0.7;
+    font-size: 0.85em;
+}
+
+/* App protocol links (mailto:, tel:, etc.) */
+.app-link {
+    color: #60a5fa;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    margin: 0 2px;
+    background: rgba(96, 165, 250, 0.08);
+    border-radius: 4px;
+    transition: all 0.15s ease;
+}
+
+.app-link:hover {
+    background: rgba(96, 165, 250, 0.15);
+    color: #93c5fd;
+}
+
+.app-link-icon {
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.app-link:hover .app-link-icon {
+    opacity: 1;
+}
+
+/* Link Confirmation Modal */
+.link-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    backdrop-filter: blur(4px);
+}
+
+.link-modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.link-modal {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 450px;
+    width: 90%;
+    text-align: center;
+    transform: scale(0.95);
+    transition: transform 0.2s ease;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.link-modal-overlay.active .link-modal {
+    transform: scale(1);
+}
+
+.link-modal-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 16px;
+    background: rgba(74, 222, 128, 0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent-green);
+}
+
+.link-modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.link-modal-text {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+.link-modal-url {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--accent-green);
+    word-break: break-all;
+    text-align: left;
+    margin-bottom: 12px;
+    border: 1px solid var(--border-color);
+    max-height: 80px;
+    overflow-y: auto;
+}
+
+.link-modal-warning {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #fbbf24;
+    margin-bottom: 20px;
+}
+
+.link-modal-warning svg {
+    flex-shrink: 0;
+}
+
+.link-modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.link-modal-cancel,
+.link-modal-open {
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: none;
+}
+
+.link-modal-cancel {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.link-modal-cancel:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.link-modal-open {
+    background: var(--accent-green);
+    color: #000;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.link-modal-open:hover {
+    background: #86efac;
+}
+
+.link-modal-open svg {
+    flex-shrink: 0;
+}
+
+/* ============================================
+   SLEEK TOKEN DISPLAY
+   ============================================ */
+.token-display {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: rgba(16, 163, 127, 0.08);
+    border: 1px solid rgba(16, 163, 127, 0.15);
+    border-radius: 20px;
+    cursor: default;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.token-display::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(16, 163, 127, 0.2), transparent 80%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.token-display:hover {
+    background: rgba(16, 163, 127, 0.15);
+    border-color: rgba(16, 163, 127, 0.4);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(16, 163, 127, 0.2);
+}
+
+.token-display:hover::before {
+    opacity: 1;
+}
+
+/* Chip Icon Styling */
+.token-icon-img {
+    width: 18px;
+    height: 18px;
+    /* Filter to make the black icon green (#10a37f) */
+    filter: invert(48%) sepia(79%) saturate(373%) hue-rotate(113deg) brightness(91%) contrast(88%);
+    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    opacity: 0.9;
+}
+
+.token-display:hover .token-icon-img {
+    opacity: 1;
+    transform: scale(1.1) rotate(180deg);
+    filter: invert(85%) sepia(25%) saturate(836%) hue-rotate(85deg) brightness(103%) contrast(102%);
+    /* #86efac */
+}
+
+.token-display.counting .token-icon-img {
+    animation: chipPulse 1s infinite;
+}
+
+@keyframes chipPulse {
+    0% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+
+    50% {
+        transform: scale(1.2);
+        filter: brightness(1.5) drop-shadow(0 0 5px #10a37f);
+    }
+
+    100% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+}
+
+.token-display .token-value {
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent-green);
+    letter-spacing: 0.02em;
+    transition: all 0.25s ease;
+    min-width: 40px;
+    text-align: right;
+}
+
+.token-display:hover .token-value {
+    color: #86efac;
+    text-shadow: 0 0 8px rgba(16, 163, 127, 0.4);
+}
+
+/* Token value color states */
+.token-display .token-value.warning {
+    color: #f59e0b;
+}
+
+.token-display:hover .token-value.warning {
+    color: #fbbf24;
+    text-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+}
+
+.token-display .token-value.danger {
+    color: #ef4444;
+}
+
+.token-display:hover .token-value.danger {
+    color: #f87171;
+    text-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+
+/* Counting animation glow */
+.token-display.counting {
+    animation: tokenCountGlow 0.3s ease;
+}
+
+@keyframes tokenCountGlow {
+    0% {
+        box-shadow: 0 0 0 rgba(16, 163, 127, 0);
+    }
+
+    50% {
+        box-shadow: 0 0 12px rgba(16, 163, 127, 0.3);
+    }
+
+    100% {
+        box-shadow: 0 0 0 rgba(16, 163, 127, 0);
+    }
+}
+
+/* Header right alignment */
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }

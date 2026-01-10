@@ -1,0 +1,260 @@
+/* ============================================
+   PERFORMANCE OPTIMIZATIONS
+   GPU Acceleration & Smooth Scrolling
+   ============================================ */
+
+/* ============================================
+   GPU ACCELERATION HINTS
+   Force compositing for animated elements
+   ============================================ */
+
+/* Elements that frequently animate should be on their own layer */
+.sidebar,
+.main-content,
+.chat-messages-wrapper,
+.message,
+.model-dropdown,
+.processing-indicator,
+.typing-indicator,
+.ai-typing-indicator {
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}
+
+/* Scrollable containers - optimize for smooth scrolling */
+.chat-messages-wrapper,
+.sidebar-section,
+.conversation-list,
+.model-dropdown {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    overscroll-behavior: contain;
+}
+
+/* ============================================
+   CONTENT CONTAINMENT
+   Isolate repaints to specific areas
+   ============================================ */
+
+/* Strict containment for chat messages - prevents layout thrashing */
+.chat-messages-wrapper {
+    contain: strict;
+}
+
+/* Layout containment for sidebar */
+.sidebar {
+    contain: layout style;
+}
+
+/* Paint containment for messages */
+.message {
+    contain: layout paint;
+}
+
+/* Contain conversation items */
+.conversation-item {
+    contain: layout style;
+}
+
+/* ============================================
+   OPTIMIZED BACKDROP FILTERS
+   Reduce blur impact on performance
+   ============================================ */
+
+/* Use lighter blur values and add GPU hints */
+.sidebar {
+    /* Reduce blur from 20px to 12px for better performance */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+/* Modal overlays - add GPU layer */
+.delete-modal-overlay,
+.modal-overlay {
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    transform: translateZ(0);
+}
+
+/* ============================================
+   ANIMATION PERFORMANCE
+   Use transform/opacity only for animations
+   ============================================ */
+
+/* Ensure all hover transitions use GPU-accelerated properties */
+.conversation-item,
+.sidebar-menu-item,
+.model-option,
+.input-action-btn,
+.send-btn,
+.copy-button {
+    transition: transform 0.15s ease, opacity 0.15s ease, background-color 0.15s ease;
+    transform: translateZ(0);
+}
+
+/* Optimize message animations */
+.message {
+    animation: messageSlideInOptimized 0.3s ease-out forwards;
+}
+
+@keyframes messageSlideInOptimized {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 15px, 0);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+/* ============================================
+   OFF-SCREEN CONTENT OPTIMIZATION
+   Skip rendering for hidden content
+   ============================================ */
+
+/* Auto-hide rendering of off-screen messages */
+.message {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 80px;
+}
+
+/* Sidebar section content visibility */
+.sidebar-section {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 300px;
+}
+
+/* ============================================
+   SCROLL PERFORMANCE
+   Optimize scroll-linked effects
+   ============================================ */
+
+/* Prevent scroll-linked position changes from causing jank */
+.chat-header.scrolled {
+    /* Use transform instead of box-shadow changes during scroll */
+    transform: translateZ(0);
+}
+
+/* Passive scroll hint for scrollable areas */
+.chat-messages-wrapper {
+    touch-action: pan-y;
+}
+
+/* ============================================
+   REDUCE PAINT COMPLEXITY
+   Simplify rendering where possible
+   ============================================ */
+
+/* Prevent unnecessary repaints on code blocks */
+.code-block {
+    contain: layout paint;
+    transform: translateZ(0);
+}
+
+/* Optimize typing indicator dots */
+.typing-dot,
+.wave-dot,
+.dot {
+    transform: translateZ(0);
+    will-change: transform, opacity;
+}
+
+/* ============================================
+   FONT RENDERING OPTIMIZATION
+   ============================================ */
+
+body {
+    text-rendering: optimizeSpeed;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================
+   IMAGE & SVG OPTIMIZATION
+   ============================================ */
+
+img,
+svg {
+    contain: layout;
+}
+
+.logo-img,
+.user-avatar-img {
+    transform: translateZ(0);
+}
+
+/* ============================================
+   INTERACTION OPTIMIZATIONS
+   Faster touch/click response
+   ============================================ */
+
+/* Remove touch delay on interactive elements */
+button,
+a,
+.clickable,
+.conversation-item,
+.model-option,
+.sidebar-menu-item {
+    touch-action: manipulation;
+}
+
+/* ============================================
+   REDUCE MOTION (ENHANCED)
+   Additional reduced motion overrides
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .message {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+    }
+}
+
+/* ============================================
+   HIGH REFRESH RATE DISPLAY SUPPORT
+   Smoother animations on 120Hz+ displays
+   ============================================ */
+
+@media (prefers-reduced-motion: no-preference) {
+
+    /* Use higher precision timing for smooth displays */
+    .sidebar,
+    .model-dropdown,
+    .message {
+        transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
+    }
+}
+
+/* ============================================
+   LAYER PROMOTION FOR CRITICAL UI
+   ============================================ */
+
+/* Promote critical UI elements to their own layer */
+#loading-screen,
+.logo-loader-overlay,
+.cookie-consent-popup,
+#imagePreviewModal {
+    transform: translateZ(0);
+    will-change: opacity;
+}
+
+/* Input area should be on its own layer */
+.input-area-wrapper,
+.input-wrapper {
+    transform: translateZ(0);
+    contain: layout;
+}

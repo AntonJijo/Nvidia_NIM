@@ -3,6 +3,39 @@
  * Handles all dynamic animations and micro-interactions
  */
 
+// ============================================
+// PERFORMANCE: Enable passive scroll listeners globally
+// This prevents scroll event listeners from blocking the main thread
+// ============================================
+(function () {
+    // Check if passive is supported
+    let passiveSupported = false;
+    try {
+        const options = {
+            get passive() {
+                passiveSupported = true;
+                return false;
+            }
+        };
+        window.addEventListener('test', null, options);
+        window.removeEventListener('test', null, options);
+    } catch (e) { }
+
+    // Make wheel/touchmove events passive by default
+    if (passiveSupported) {
+        const originalAddEventListener = EventTarget.prototype.addEventListener;
+        EventTarget.prototype.addEventListener = function (type, listener, options) {
+            const passiveEvents = ['scroll', 'wheel', 'touchstart', 'touchmove'];
+            if (passiveEvents.includes(type) && typeof options !== 'object') {
+                options = { passive: true, capture: !!options };
+            } else if (passiveEvents.includes(type) && typeof options === 'object' && options.passive === undefined) {
+                options.passive = true;
+            }
+            originalAddEventListener.call(this, type, listener, options);
+        };
+    }
+})();
+
 class AnimationController {
     constructor() {
         this.prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -327,10 +360,21 @@ class AnimationController {
         const content = messageElement.querySelector('.message-content');
         if (!content) return;
 
+        // Skip if content already has complex HTML (loaded from history)
+        // Only apply stagger effect to simple text content during typing
+        // This prevents destroying formatted markdown content
+        if (content.querySelector('p, ul, ol, pre, code, h1, h2, h3, blockquote')) {
+            return; // Has structured HTML, don't destroy it
+        }
+
         const text = content.textContent;
         const words = text.split(' ');
 
-        if (words.length > 50 || this.prefersReducedMotion) return; // Skip for long messages
+        // Skip for long messages or if already processed
+        if (words.length > 50 || this.prefersReducedMotion) return;
+
+        // Skip if content is empty or already has word-reveal spans
+        if (!text.trim() || content.querySelector('.word-reveal')) return;
 
         content.innerHTML = '';
         words.forEach((word, index) => {

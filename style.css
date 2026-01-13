@@ -2424,6 +2424,7 @@ blockquote {
     .sidebar,
     .sidebar-overlay {
         height: 100dvh;
+        height: var(--app-height, 100dvh);
     }
 
     /* Sidebar - Full screen on mobile when expanded */

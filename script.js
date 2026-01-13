@@ -379,6 +379,7 @@ class Chatbot {
         this.contextValue = document.getElementById('contextValue');
 
         this.initializeChatGPTUI();
+        this.setupMobileViewport();
         this.setupGlobalScrolling();
 
         // File Upload Elements
@@ -3115,6 +3116,22 @@ class Chatbot {
             }, { passive: true });
         }
     }
+
+    setupMobileViewport() {
+        // Fix for mobile keyboard covering input
+        const setHeight = () => {
+            const height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+            document.documentElement.style.setProperty('--app-height', `${height}px`);
+        };
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', setHeight);
+            window.visualViewport.addEventListener('scroll', setHeight);
+        }
+        window.addEventListener('resize', setHeight);
+        setHeight(); // Initial set
+    }
+
     async handleFileSelect(e) {
         let file;
         if (e.target && e.target.files) {

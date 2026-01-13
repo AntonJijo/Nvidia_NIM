@@ -3,7 +3,7 @@
 // Set to true to force all API calls to localhost:8000
 // Set to false for production (auto-detects based on hostname)
 // ============================================
-const DEV_MODE = true;
+const DEV_MODE = false;
 const DEV_SERVER_URL = 'http://localhost:8000';
 
 // Helper function to get server URLs based on dev mode

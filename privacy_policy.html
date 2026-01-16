@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - NVIDIA NIM</title>
+    <link rel="icon" type="image/svg+xml" href="Main_Logo.svg">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-deep: #050505;
+            --bg-card: #111111;
+            --accent: #76b900;
+            --accent-glow: rgba(118, 185, 0, 0.4);
+            --text-main: #ececec;
+            --text-dim: #9ca3af;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            line-height: 1.7;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        /* Ambient Background */
+        .ambient-bg {
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(circle at 20% 20%, rgba(118, 185, 0, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 80% 80%, rgba(118, 185, 0, 0.05) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 60px auto;
+            padding: 40px;
+            background: rgba(17, 17, 17, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .logo-box {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 20px;
+            background: rgba(118, 185, 0, 0.1);
+            border: 1px solid var(--accent);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .logo-box img {
+            width: 35px;
+            height: 35px;
+        }
+
+        h1 {
+            font-size: 2.8rem;
+            font-weight: 700;
+            margin: 0;
+            background: linear-gradient(135deg, #fff 0%, #aaa 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .last-updated {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+
+        h2 {
+            color: var(--accent);
+            font-size: 1.5rem;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        h2 i {
+            font-size: 1.2rem;
+        }
+
+        p {
+            margin-bottom: 20px;
+            color: var(--text-main);
+        }
+
+        ul {
+            padding-left: 20px;
+            margin-bottom: 20px;
+        }
+
+        li {
+            margin-bottom: 10px;
+        }
+
+        .highlight-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 4px solid var(--accent);
+            padding: 20px;
+            border-radius: 0 12px 12px 0;
+            margin: 30px 0;
+        }
+
+        .policy-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 25px 0;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .policy-table th,
+        .policy-table td {
+            padding: 15px 20px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .policy-table th {
+            background: rgba(118, 185, 0, 0.1);
+            color: var(--accent);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+        }
+
+        .policy-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .footer-nav {
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .btn-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--accent);
+            color: #000;
+            text-decoration: none;
+            padding: 12px 30px;
+            border-radius: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 20px rgba(118, 185, 0, 0.2);
+        }
+
+        .btn-back:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 30px rgba(118, 185, 0, 0.4);
+            background: #88d400;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 20px;
+                padding: 25px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="ambient-bg"></div>
+    <div class="container">
+        <header>
+            <div class="logo-box">
+                <img src="Main_Logo.svg" alt="NVIDIA Logo">
+            </div>
+            <h1>Privacy Policy</h1>
+            <p class="last-updated">Last Updated: January 16, 2026</p>
+        </header>
+
+        <section>
+            <p>Welcome to <strong>NVIDIA NIM</strong> (the "Application"). Your privacy is fundamental to our mission of
+                providing a powerful yet secure AI experience. This Privacy Policy details how we handle your
+                information, our commitment to data transparency, and our use of local technologies.</p>
+
+            <div class="highlight-card">
+                <strong>Our Core Philosophy:</strong> We prioritize your privacy by keeping your conversation history
+                stored locally on your own device. Your messages are processed in real-time to generate responses and
+                are not used for profile-building or advertising.
+            </div>
+        </section>
+
+        <section>
+            <h2><i class="fas fa-database"></i> 1. Information We Collect</h2>
+            <p>During your use of the Application, we collect the following types of information:</p>
+            <ul>
+                <li><strong>Message Content:</strong> The text and files you input into the chat are transmitted to our
+                    servers to generate responses via AI models.</li>
+                <li><strong>Technical Identifiers:</strong> We use an anonymous Session ID to maintain conversation
+                    context during a live session.</li>
+                <li><strong>Device Information:</strong> Basic technical logs (IP address, browser type) may be
+                    processed by our infrastructure for security, rate-limiting, and server health monitoring.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2><i class="fas fa-cog"></i> 2. How Your Data is Used</h2>
+            <p>Your information is used strictly for the following purposes:</p>
+            <ul>
+                <li><strong>Response Generation:</strong> To provide accurate AI-driven answers to your queries.</li>
+                <li><strong>System Improvement:</strong> Anonymous logs may be reviewed to fix bugs, optimize
+                    performance, and harden security.</li>
+                <li><strong>Safety & Compliance:</strong> To prevent abuse, avoid toxic content generation, and comply
+                    with legal requirements.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2><i class="fas fa-cookie-bite"></i> 3. Local Storage Policy (Cookie Policy)</h2>
+            <p>NVIDIA NIM does not use traditional tracking cookies. Instead, we use <strong>Browser Local
+                    Storage</strong> to provide a seamless user experience. This information remains on your device and
+                is not shared with us for tracking purposes.</p>
+
+            <table class="policy-table">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Type</th>
+                        <th>Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>History Consent</td>
+                        <td>Local Storage</td>
+                        <td>Stores your choice regarding the long-term saving of chat history.</td>
+                    </tr>
+                    <tr>
+                        <td>Chat History</td>
+                        <td>Local Storage</td>
+                        <td>Stores your past conversations locally so you can resume them later.</td>
+                    </tr>
+                    <tr>
+                        <td>Active Session</td>
+                        <td>Local Storage</td>
+                        <td>Maintains your current connection state and conversation context.</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p><em>Note: You can delete this data at any time by clearing your browser cache or using the "Clear
+                    History" function in settings.</em></p>
+        </section>
+
+        <section>
+            <h2><i class="fas fa-share-nodes"></i> 4. Third-Party Integration</h2>
+            <p>To provide high-quality intelligence, we integrate with industry-leading AI providers. When you send a
+                message, it is processed by one of the following:</p>
+            <ul>
+                <li><strong>NVIDIA NIM API:</strong> For enterprise-grade inference.</li>
+                <li><strong>OpenRouter:</strong> For access to diverse open-source model architectures.</li>
+                <li><strong>Tavily Search:</strong> Used only when "Web Search" is triggered to provide real-time
+                    information.</li>
+            </ul>
+            <p>These providers have their own strict privacy protocols and do not use your inputs to train their base
+                models unless explicitly disclosed by their own policies.</p>
+        </section>
+
+        <section>
+            <h2><i class="fas fa-shield-halved"></i> 5. Data Security</h2>
+            <p>We implement multi-layered security to protect your data:</p>
+            <ul>
+                <li><strong>End-to-End Transit Security:</strong> All data is encrypted using industry-standard TLS
+                    protocols during transmission.</li>
+                <li><strong>Content Security Policy (CSP):</strong> Strict browser policies to prevent XSS and data
+                    injection attacks.</li>
+                <li><strong>Sanitization:</strong> All AI outputs are sanitized before rendering to ensure your browser
+                    remains secure.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2><i class="fas fa-user-check"></i> 6. Your Rights</h2>
+            <p>You have full control over your data. Since most data is stored locally, you can:</p>
+            <ul>
+                <li><strong>Delete Your History:</strong> Use the sidebar controls to permanently erase local chat
+                    records.</li>
+                <li><strong>Opt-Out:</strong> Decline the chat history feature to ensure no data is persisted after your
+                    session ends.</li>
+                <li><strong>Anonymity:</strong> Continue using the service without creating a traditional account,
+                    maintaining a purely session-based identity.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2><i class="fas fa-envelope"></i> 7. Contact Us</h2>
+            <p>If you have questions about this Privacy Policy or our data practices, please contact the development
+                team through the project's official GitHub repository.</p>
+        </section>
+
+        <div class="footer-nav">
+            <a href="index.html" class="btn-back">
+                <i class="fas fa-arrow-left"></i> Back to NVIDIA NIM
+            </a>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -25,11 +25,12 @@ app = Flask(__name__)
 # Security: Max request size (10MB) to prevent DoS
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB max upload
 
-# Production Origins (no localhost)
+# Production Origins
 PRODUCTION_ORIGINS = [
     "https://antonjijo.github.io",
     "https://nvidia-nim.pages.dev",
     "https://nvidia-nim-bot.onrender.com",
+    "https://nvidia.pythonanywhere.com",
     "https://Nvidia.pythonanywhere.com"
 ]
 
@@ -249,23 +250,22 @@ def check_rate_limit(ip_address, max_requests=10, window_seconds=60):
 def validate_request_origin():
     """Validate that the request comes from an allowed origin"""
     origin = request.headers.get('Origin')
-    referer = request.headers.get('Referer')
     
-    # Use global ALLOWED_ORIGINS (defined based on environment)
-    # Check origin header
-    if origin and origin not in ALLOWED_ORIGINS:
-        return False
-    
-    # Check referer header as fallback
-    if not origin and referer:
-        for allowed in ALLOWED_ORIGINS:
-            if referer.startswith(allowed):
-                return True
-        return False
-    
-    # Allow requests without origin/referer (e.g., direct API calls in dev)
-    # In production, this should be more restrictive
-    return True
+    # In development or if no origin (e.g. direct call), allow it
+    if not IS_PRODUCTION or not origin:
+        return True
+        
+    # Standard origin validation
+    if origin in ALLOWED_ORIGINS:
+        return True
+        
+    # Fallback: Check if it's a subdomain of allowed domains
+    for allowed in ALLOWED_ORIGINS:
+        if origin.endswith(allowed.replace("https://", "")):
+            return True
+            
+    print(f"CORS BLOCKED: Origin '{origin}' not in {ALLOWED_ORIGINS}")
+    return False
 
 def log_session_details(session_id, user_message, selected_model, conversation_messages, api_response=None, error=None):
     """

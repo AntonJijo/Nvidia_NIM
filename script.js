@@ -12,7 +12,7 @@ function getServerUrls() {
         return [DEV_SERVER_URL];
     }
     return (window.location.hostname === 'antonjijo.github.io' || window.location.hostname === 'nvidia-nim.pages.dev')
-        ? ['https://nvidia-nim-bot.onrender.com', 'https://Nvidia.pythonanywhere.com']
+        ? ['https://nvidia-nim-bot.onrender.com', 'https://nvidia.pythonanywhere.com']
         : ['http://localhost:8000'];
 }
 

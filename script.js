@@ -1496,13 +1496,11 @@ class Chatbot {
                  alt="Reasoning" 
                  class="slash-item-icon">
             <span>Thinking</span>
-            <span class="slash-item-warning" id="reasoningNote" data-tooltip="Switch to DeepSeek R1 or Kimi K2 to enable Thinking Mode">
-                <i class="fas fa-exclamation-triangle"></i>
-            </span>
         `;
         reasoningItem.onclick = (e) => {
             if (reasoningItem.classList.contains('disabled')) {
                 e.stopPropagation();
+                this.showToast('Switch to DeepSeek R1 or Kimi K2 to enable Thinking Mode', 'warning');
                 return;
             }
             this.toggleReasoningMode();
@@ -1549,15 +1547,12 @@ class Chatbot {
 
     updateReasoningSlashItem() {
         const reasoningItem = document.getElementById('reasoningSlashItem');
-        const reasoningWarning = document.getElementById('reasoningNote');
-        if (!reasoningItem || !reasoningWarning) return;
+        if (!reasoningItem) return;
 
         if (this.isReasoningCapableModel()) {
             reasoningItem.classList.remove('disabled');
-            reasoningWarning.style.display = 'none';
         } else {
             reasoningItem.classList.add('disabled');
-            reasoningWarning.style.display = 'flex';
         }
     }
 
